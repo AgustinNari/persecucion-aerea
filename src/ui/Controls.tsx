@@ -1,3 +1,411 @@
-/**
- * Grupo 3 — Formularios de entrada (condiciones iniciales, escenario, parámetros).
+﻿/**
+ * Grupo 3 — Formularios de entrada
  */
+import { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import type {
+  SimulationConfig,
+  GuidanceLaw,
+  ManeuverType,
+  Integrator,
+  Vec3,
+} from "../shared/types";
+
+interface ControlsProps {
+  config: SimulationConfig;
+  onConfigChange: (config: SimulationConfig) => void;
+  onSimulate: (config: SimulationConfig) => void;
+}
+
+// Military Section
+interface SectionProps {
+  title: string;
+  code: string;
+  accentColor: "hud" | "amber" | "cyan" | "neutral";
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+function Section({ title, code, accentColor, defaultOpen = true, children }: SectionProps) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  const accentMap = {
+    hud: { text: "text-hud", border: "border-hud/20", dot: "bg-hud" },
+    amber: { text: "text-amber-glow", border: "border-amber-glow/20", dot: "bg-amber-glow" },
+    cyan: { text: "text-cyan-glow", border: "border-cyan-glow/20", dot: "bg-cyan-glow" },
+    neutral: { text: "text-mist", border: "border-slate-steel", dot: "bg-mist" },
+  };
+
+  const accent = accentMap[accentColor];
+
+  return (
+    <div className={`border-b ${accent.border}`}>
+      <motion.button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer hover:bg-glass-hover transition-colors"
+        whileTap={{ scale: 0.995 }}
+      >
+        <div className={`w-1.5 h-1.5 ${accent.dot} ${open ? "pulse-dot" : ""}`} />
+        <span className="text-[8px] text-ash tracking-[0.15em] font-bold">[{code}]</span>
+        <span className={`text-[9px] font-bold tracking-[0.15em] flex-1 ${accent.text}`}>
+          {title}
+        </span>
+        <motion.span
+          animate={{ rotate: open ? 90 : 0 }}
+          transition={{ duration: 0.15 }}
+          className="text-ash text-[8px]"
+        >
+          ▸
+        </motion.span>
+      </motion.button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-3 pb-3 space-y-2.5">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+//Field components
+interface NumberFieldProps {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+  min?: number;
+  max?: number;
+  unit?: string;
+}
+
+function NumberField({ label, value, onChange, step = 1, min, max, unit }: NumberFieldProps) {
+  return (
+    <div>
+      <label>
+        {label}
+        {unit && <span className="text-ash ml-1 text-[8px]">[{unit}]</span>}
+      </label>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        step={step}
+        min={min}
+        max={max}
+      />
+    </div>
+  );
+}
+
+interface Vec3FieldProps {
+  label: string;
+  value: Vec3;
+  onChange: (v: Vec3) => void;
+  step?: number;
+}
+
+function Vec3Field({ label, value, onChange, step = 1 }: Vec3FieldProps) {
+  const handleComponent = (idx: number, v: number) => {
+    const next: Vec3 = [...value];
+    next[idx] = v;
+    onChange(next);
+  };
+
+  return (
+    <div>
+      <label>{label}</label>
+      <div className="grid grid-cols-3 gap-1">
+        {(["X", "Y", "Z"] as const).map((l, i) => (
+          <div key={l} className="relative">
+            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[8px] text-ash font-bold tracking-wider">
+              {l}
+            </span>
+            <input
+              type="number"
+              value={value[i]}
+              onChange={(e) => handleComponent(i, Number(e.target.value))}
+              step={step}
+              className="!pl-5 !text-[11px]"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface SelectFieldProps<T extends string> {
+  label: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}
+
+function SelectField<T extends string>({ label, value, onChange, options }: SelectFieldProps<T>) {
+  return (
+    <div>
+      <label>{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value as T)}>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+//Options
+const GUIDANCE_OPTIONS: { value: GuidanceLaw; label: string }[] = [
+  { value: "pure_pursuit", label: "PURE PURSUIT (PP)" },
+  { value: "proportional_nav", label: "PROPORTIONAL NAV (PN)" },
+];
+
+const MANEUVER_OPTIONS: { value: ManeuverType; label: string }[] = [
+  { value: "straight", label: "RECTA (SIN MANIOBRA)" },
+  { value: "constant_turn", label: "VIRAJE CONSTANTE" },
+  { value: "weave", label: "SERPENTEO (WEAVE)" },
+  { value: "reactive_evade", label: "EVASIÓN REACTIVA" },
+];
+
+const INTEGRATOR_OPTIONS: { value: Integrator; label: string }[] = [
+  { value: "rk4", label: "RUNGE-KUTTA 4 (RK4)" },
+  { value: "euler", label: "EULER (DIDÁCTICO)" },
+];
+
+//Main Component
+export default function Controls({ config, onConfigChange, onSimulate }: ControlsProps) {
+  const updateAircraft = useCallback(
+    (patch: Partial<typeof config.aircraft>) => {
+      onConfigChange({ ...config, aircraft: { ...config.aircraft, ...patch } });
+    },
+    [config, onConfigChange],
+  );
+
+  const updateMissile = useCallback(
+    (patch: Partial<typeof config.missile>) => {
+      onConfigChange({ ...config, missile: { ...config.missile, ...patch } });
+    },
+    [config, onConfigChange],
+  );
+
+  const updateSim = useCallback(
+    (patch: Partial<typeof config.simulation>) => {
+      onConfigChange({ ...config, simulation: { ...config.simulation, ...patch } });
+    },
+    [config, onConfigChange],
+  );
+
+  const updateManeuverParams = useCallback(
+    (patch: Partial<NonNullable<typeof config.aircraft.maneuverParams>>) => {
+      onConfigChange({
+        ...config,
+        aircraft: {
+          ...config.aircraft,
+          maneuverParams: { ...config.aircraft.maneuverParams, ...patch },
+        },
+      });
+    },
+    [config, onConfigChange],
+  );
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="px-3 py-2 border-b border-panel-border flex items-center gap-2">
+        <div className="w-1.5 h-1.5 bg-hud pulse-dot" />
+        <span className="text-[9px] font-bold tracking-[0.2em] text-hud text-glow-hud">
+          MISSION CONFIG
+        </span>
+        <span className="text-[7px] text-ash ml-auto tracking-[0.15em]">[SYS-PARAM]</span>
+      </div>
+
+      {/* Scrollable sections */}
+      <div className="flex-1 overflow-y-auto">
+        {/* TARGET (Aircraft) */}
+        <Section title="TARGET · AVIÓN" code="TGT" accentColor="amber">
+          <Vec3Field
+            label="POS INICIAL"
+            value={config.aircraft.position}
+            onChange={(v) => updateAircraft({ position: v })}
+          />
+          <Vec3Field
+            label="VEL INICIAL"
+            value={config.aircraft.velocity}
+            onChange={(v) => updateAircraft({ velocity: v })}
+            step={10}
+          />
+          <SelectField
+            label="MANIOBRA EVASIVA"
+            value={config.aircraft.maneuver}
+            onChange={(v) => updateAircraft({ maneuver: v })}
+            options={MANEUVER_OPTIONS}
+          />
+          <NumberField
+            label="ACEL. MÁX LATERAL"
+            value={config.aircraft.maxAccel}
+            onChange={(v) => updateAircraft({ maxAccel: v })}
+            step={5}
+            min={0}
+            unit="m/s²"
+          />
+
+          <AnimatePresence>
+            {config.aircraft.maneuver === "constant_turn" && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="overflow-hidden"
+              >
+                <NumberField
+                  label="VEL. DE GIRO"
+                  value={config.aircraft.maneuverParams?.turnRate ?? 0.5}
+                  onChange={(v) => updateManeuverParams({ turnRate: v })}
+                  step={0.1}
+                  unit="rad/s"
+                />
+              </motion.div>
+            )}
+            {config.aircraft.maneuver === "weave" && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="overflow-hidden space-y-2.5"
+              >
+                <NumberField
+                  label="AMPLITUD WEAVE"
+                  value={config.aircraft.maneuverParams?.weaveAmp ?? 95}
+                  onChange={(v) => updateManeuverParams({ weaveAmp: v })}
+                  step={5}
+                  unit="m/s²"
+                />
+                <NumberField
+                  label="FRECUENCIA WEAVE"
+                  value={config.aircraft.maneuverParams?.weaveFreq ?? 2.3}
+                  onChange={(v) => updateManeuverParams({ weaveFreq: v })}
+                  step={0.1}
+                  unit="rad/s"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Section>
+
+        {/*WEAPON (Missile) */}
+        <Section title="WEAPON · MISIL" code="WPN" accentColor="cyan">
+          <Vec3Field
+            label="POS INICIAL"
+            value={config.missile.position}
+            onChange={(v) => updateMissile({ position: v })}
+          />
+          <Vec3Field
+            label="VEL INICIAL"
+            value={config.missile.velocity}
+            onChange={(v) => updateMissile({ velocity: v })}
+            step={10}
+          />
+          <SelectField
+            label="LEY DE GUIADO"
+            value={config.missile.guidanceLaw}
+            onChange={(v) => updateMissile({ guidanceLaw: v })}
+            options={GUIDANCE_OPTIONS}
+          />
+
+          <AnimatePresence>
+            {config.missile.guidanceLaw === "proportional_nav" && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="overflow-hidden"
+              >
+                <NumberField
+                  label="CONSTANTE N"
+                  value={config.missile.navConstant}
+                  onChange={(v) => updateMissile({ navConstant: v })}
+                  step={0.5}
+                  min={1}
+                  max={10}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <NumberField
+            label="ACEL. MÁX LATERAL"
+            value={config.missile.maxAccel}
+            onChange={(v) => updateMissile({ maxAccel: v })}
+            step={10}
+            min={0}
+            unit="m/s²"
+          />
+        </Section>
+
+        {/*SIM PARAMS*/}
+        <Section title="SIMULACIÓN" code="SIM" accentColor="neutral" defaultOpen={false}>
+          <NumberField
+            label="PASO DE TIEMPO (dt)"
+            value={config.simulation.dt}
+            onChange={(v) => updateSim({ dt: v })}
+            step={0.01}
+            min={0.001}
+            unit="s"
+          />
+          <NumberField
+            label="TIEMPO MÁXIMO"
+            value={config.simulation.maxTime}
+            onChange={(v) => updateSim({ maxTime: v })}
+            step={1}
+            min={1}
+            unit="s"
+          />
+          <NumberField
+            label="RADIO DE IMPACTO"
+            value={config.simulation.hitRadius}
+            onChange={(v) => updateSim({ hitRadius: v })}
+            step={1}
+            min={1}
+            unit="m"
+          />
+          <SelectField
+            label="INTEGRADOR NUMÉRICO"
+            value={config.simulation.integrator}
+            onChange={(v) => updateSim({ integrator: v })}
+            options={INTEGRATOR_OPTIONS}
+          />
+        </Section>
+      </div>
+
+      {/*Execute Button*/}
+      <div className="px-3 py-2.5 border-t border-panel-border">
+        <motion.button
+          onClick={() => onSimulate(config)}
+          className="btn btn-primary w-full"
+          whileHover={{ scale: 1.01, boxShadow: "0 0 24px rgba(0, 255, 136, 0.2)" }}
+          whileTap={{ scale: 0.99 }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+            <path d="M1 0.5L9 5L1 9.5V0.5Z" />
+          </svg>
+          EJECUTAR SIMULACIÓN
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+

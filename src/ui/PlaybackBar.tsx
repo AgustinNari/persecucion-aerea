@@ -1,3 +1,186 @@
-/**
- * Grupo 3 — Barra de reproducción (play / pausa / velocidad / scrub → currentFrame).
+﻿/**
+ * Grupo 3 — Barra de reproducción tipo timeline
+ * Play/pausa/velocidad/scrub → currentFrame.
  */
+import { useRef, useCallback } from "react";
+import { motion } from "framer-motion";
+
+interface PlaybackBarProps {
+  currentFrame: number;
+  totalFrames: number;
+  currentTime: number;
+  totalTime: number;
+  playing: boolean;
+  speed: number;
+  speedPresets: number[];
+  onPlay: () => void;
+  onPause: () => void;
+  onSeek: (frame: number) => void;
+  onRestart: () => void;
+  onSpeedChange: (speed: number) => void;
+}
+
+export default function PlaybackBar({
+  currentFrame,
+  totalFrames,
+  currentTime,
+  totalTime,
+  playing,
+  speed,
+  speedPresets,
+  onPlay,
+  onPause,
+  onSeek,
+  onRestart,
+  onSpeedChange,
+}: PlaybackBarProps) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const progress = totalFrames > 1 ? currentFrame / (totalFrames - 1) : 0;
+
+  //Seek logic
+  const seekFromEvent = useCallback(
+    (clientX: number) => {
+      if (!trackRef.current) return;
+      const rect = trackRef.current.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      onSeek(Math.round(ratio * (totalFrames - 1)));
+    },
+    [onSeek, totalFrames],
+  );
+
+  const handleTrackMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      seekFromEvent(e.clientX);
+      const handleMouseMove = (ev: MouseEvent) => seekFromEvent(ev.clientX);
+      const handleMouseUp = () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [seekFromEvent],
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: 0.2 }}
+      className="border-t border-panel-border bg-obsidian/95 px-4 py-2 flex items-center gap-3"
+    >
+      {/*Mission label */}
+      <span className="text-[8px] text-mist tracking-[0.2em] min-w-[60px]">TIMELINE</span>
+
+      {/*Playback controls*/}
+      <div className="flex items-center gap-1">
+        {/* Reset */}
+        <motion.button
+          onClick={onRestart}
+          className="w-6 h-6 flex items-center justify-center border border-slate-steel text-mist hover:text-hud hover:border-hud/30 transition-colors cursor-pointer"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          title="RESET"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1.5 1.5V8.5M3 5L8.5 1.5V8.5L3 5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+          </svg>
+        </motion.button>
+
+        {/* Play/Pause */}
+        <motion.button
+          onClick={playing ? onPause : onPlay}
+          className={`w-8 h-8 flex items-center justify-center border cursor-pointer transition-all ${playing
+            ? "bg-hud/15 border-hud text-hud glow-hud"
+            : "bg-hud/5 border-hud/50 text-hud hover:bg-hud/10 hover:border-hud"
+            }`}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          title={playing ? "PAUSE" : "EXECUTE"}
+        >
+          {playing ? (
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+              <rect x="2" y="1.5" width="3" height="9" rx="0.5" />
+              <rect x="7" y="1.5" width="3" height="9" rx="0.5" />
+            </svg>
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+              <path d="M2.5 1L10.5 6L2.5 11V1Z" />
+            </svg>
+          )}
+        </motion.button>
+      </div>
+
+      {/*Time readout*/}
+      <div className="text-[11px] tabular-nums tracking-wider min-w-[110px]">
+        <span className="text-hud font-bold text-glow-hud">{currentTime.toFixed(2)}</span>
+        <span className="text-ash mx-1">/</span>
+        <span className="text-mist">{totalTime.toFixed(2)}</span>
+        <span className="text-[8px] text-ash ml-0.5">s</span>
+      </div>
+
+      {/*Progress track*/}
+      <div
+        ref={trackRef}
+        onMouseDown={handleTrackMouseDown}
+        className="flex-1 relative h-6 flex items-center cursor-crosshair group"
+      >
+        {/* Track background */}
+        <div className="absolute inset-x-0 h-1 bg-obsidian border border-slate-steel overflow-hidden">
+          {/* Progress fill */}
+          <div
+            className="h-full bg-gradient-to-r from-hud-dim via-hud-mid to-hud relative"
+            style={{ width: `${progress * 100}%` }}
+          >
+            {/* Leading edge glow */}
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-hud/30 blur-sm" />
+          </div>
+        </div>
+
+        {/* Tick marks every 10% */}
+        {Array.from({ length: 11 }).map((_, i) => (
+          <div
+            key={i}
+            className="absolute top-0 w-px bg-slate-steel/50"
+            style={{ left: `${i * 10}%`, height: i % 5 === 0 ? "100%" : "30%" }}
+          />
+        ))}
+
+        {/* Thumb military crosshair */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 z-10 flex flex-col items-center"
+          style={{ left: `${progress * 100}%` }}
+        >
+          <div className="w-px h-1.5 bg-hud" />
+          <div className="w-2.5 h-2.5 border border-hud bg-hud/20 rotate-45 group-hover:bg-hud/40 transition-colors" />
+          <div className="w-px h-1.5 bg-hud" />
+        </div>
+      </div>
+
+      {/*Frame counter */}
+      <div className="text-[9px] text-ash tabular-nums tracking-wider min-w-[70px] text-right">
+        FRAME {String(currentFrame).padStart(3, "0")}/{String(totalFrames - 1).padStart(3, "0")}
+      </div>
+
+      {/* Speed selector */}
+      <div className="flex items-center gap-px">
+        <span className="text-[8px] text-mist tracking-[0.15em] mr-1">SPD</span>
+        {speedPresets.map((s) => (
+          <motion.button
+            key={s}
+            onClick={() => onSpeedChange(s)}
+            className={`px-1.5 py-0.5 text-[9px] font-bold tracking-wider cursor-pointer border transition-all ${speed === s
+              ? "bg-hud/15 text-hud border-hud/40"
+              : "text-ash border-slate-steel hover:text-mist hover:border-mist/30"
+              }`}
+            whileHover={{ y: -1 }}
+            whileTap={{ y: 0 }}
+          >
+            {s}×
+          </motion.button>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
