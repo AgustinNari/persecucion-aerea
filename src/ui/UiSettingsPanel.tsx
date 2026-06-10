@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export type UiTheme = "green" | "cyan" | "amber" | "threat";
+export type UiTheme = "green" | "cyan" | "amber" | "threat" | "blueprint" | "terminal";
 export type UiDensity = "compact" | "normal" | "presentation";
 
 export interface UiSettings {
@@ -23,6 +23,8 @@ const themes: { value: UiTheme; label: string }[] = [
   { value: "cyan", label: "CIAN RADAR" },
   { value: "amber", label: "ÁMBAR CABINA" },
   { value: "threat", label: "ROJO AMENAZA" },
+  { value: "blueprint", label: "BLUEPRINT AZUL" },
+  { value: "terminal", label: "TERMINAL TÁCTICA" },
 ];
 
 export default function UiSettingsPanel({
@@ -35,7 +37,7 @@ export default function UiSettingsPanel({
   const patch = (next: Partial<UiSettings>) => onChange({ ...settings, ...next });
 
   return (
-    <div className="relative">
+    <div className="relative topbar-control">
       <button
         onClick={() => setOpen((value) => !value)}
         className="hud-mini-button"
@@ -45,14 +47,16 @@ export default function UiSettingsPanel({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-[80] w-64 border border-panel-border bg-obsidian/98 p-3 shadow-xl">
-          <div className="tac-label tac-label-hud mb-2">PREFERENCIAS DE INTERFAZ</div>
-          <label>TEMA</label>
+        <div className="ui-settings-popover">
+          <div className="tac-label tac-label-hud mb-1">UI / VISUAL</div>
+          <p className="text-[8px] text-ash tracking-wide mb-3">Apariencia local de la estación táctica.</p>
+          <label>PRESET VISUAL</label>
           <select value={settings.theme} onChange={(event) => patch({ theme: event.target.value as UiTheme })}>
             {themes.map((theme) => <option key={theme.value} value={theme.value}>{theme.label}</option>)}
           </select>
 
-          <label className="mt-3">DENSIDAD</label>
+          <div className="mil-divider my-3" />
+          <label>DENSIDAD DE WORKSPACE</label>
           <div className="grid grid-cols-3 gap-1">
             {(["compact", "normal", "presentation"] as UiDensity[]).map((density) => (
               <button
@@ -65,7 +69,9 @@ export default function UiSettingsPanel({
             ))}
           </div>
 
-          <div className="mt-3 space-y-1">
+          <div className="mil-divider my-3" />
+          <label>EFECTOS Y PRESENTACIÓN</label>
+          <div className="space-y-1">
             <Toggle label="SCANLINES" enabled={settings.scanlines} onChange={(scanlines) => patch({ scanlines })} />
             <Toggle label="EFECTOS / GLOW" enabled={settings.glow} onChange={(glow) => patch({ glow })} />
             <Toggle label="ANIMACIÓN REDUCIDA" enabled={settings.reducedMotion} onChange={(reducedMotion) => patch({ reducedMotion })} />

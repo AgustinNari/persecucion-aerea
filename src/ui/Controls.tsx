@@ -16,6 +16,8 @@ interface ControlsProps {
   config: SimulationConfig;
   onConfigChange: (config: SimulationConfig) => void;
   onSimulate: (config: SimulationConfig) => void;
+  configStatus?: "APLICADA" | "PENDIENTE" | "INVÁLIDA";
+  runCount?: number;
 }
 
 // Military Section
@@ -257,7 +259,7 @@ export function validateConfig(config: SimulationConfig): string[] {
 }
 
 //Main Component
-export default function Controls({ config, onConfigChange, onSimulate }: ControlsProps) {
+export default function Controls({ config, onConfigChange, onSimulate, configStatus = "APLICADA", runCount = 1 }: ControlsProps) {
   const validationErrors = validateConfig(config);
 
   const updateAircraft = useCallback(
@@ -514,6 +516,12 @@ export default function Controls({ config, onConfigChange, onSimulate }: Control
 
       {/*Execute Button*/}
       <div className="px-3 py-2.5 border-t border-panel-border space-y-2">
+        <div className="flex items-center justify-between text-[8px] tracking-[0.12em]">
+          <span className={configStatus === "INVÁLIDA" ? "status-chip status-chip-danger" : configStatus === "PENDIENTE" ? "status-chip status-chip-warning" : "status-chip status-chip-ready"}>
+            CONFIG {configStatus}
+          </span>
+          <span className="text-ash">ÚLTIMO RESULTADO: RUN #{runCount}</span>
+        </div>
         <div className="grid grid-cols-2 gap-1">
           <button onClick={() => applyPreset("pn")} className="btn btn-ghost !px-1 !py-1.5 !text-[8px]">
             INTERCEPCIÓN PN
@@ -537,7 +545,8 @@ export default function Controls({ config, onConfigChange, onSimulate }: Control
 
         <motion.button
           onClick={handleSimulate}
-          className={`btn btn-primary w-full ${validationErrors.length > 0 ? "opacity-50" : ""}`}
+          disabled={validationErrors.length > 0}
+          className={`btn btn-primary w-full ${validationErrors.length > 0 ? "opacity-50 cursor-not-allowed" : configStatus === "PENDIENTE" ? "execute-attention" : ""}`}
           aria-disabled={validationErrors.length > 0}
           title={validationErrors.length > 0 ? "Corregí la configuración antes de ejecutar" : "Cargar simulación con la configuración actual"}
           whileHover={{ scale: 1.01, boxShadow: "0 0 24px rgba(0, 255, 136, 0.2)" }}
@@ -546,7 +555,7 @@ export default function Controls({ config, onConfigChange, onSimulate }: Control
           <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
             <path d="M1 0.5L9 5L1 9.5V0.5Z" />
           </svg>
-          EJECUTAR SIMULACIÓN
+          {configStatus === "PENDIENTE" ? "APLICAR CAMBIOS · EJECUTAR" : "EJECUTAR SIMULACIÓN"}
         </motion.button>
       </div>
     </div>

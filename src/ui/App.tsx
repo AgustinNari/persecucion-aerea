@@ -60,6 +60,9 @@ export default function App() {
     density: "normal",
   });
   const [uiMessage, setUiMessage] = useState("Simulación cargada con datos mock · lista para reproducir");
+  const [runCount, setRunCount] = useState(1);
+  const [lastRunTime, setLastRunTime] = useState(() => new Date());
+  const [runNotice, setRunNotice] = useState<string | null>(null);
   const lastTimestampRef = useRef<number | null>(null);
   const elapsedRef = useRef(0);
 
@@ -82,6 +85,12 @@ export default function App() {
   useEffect(() => {
     setCurrentFrame((frame) => clampFrame(frame, lastFrame));
   }, [lastFrame, result]);
+
+  useEffect(() => {
+    if (!runNotice) return;
+    const timeoutId = window.setTimeout(() => setRunNotice(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [runNotice]);
 
   useEffect(() => {
     if (!playing || totalFrames <= 1) {
@@ -124,7 +133,10 @@ export default function App() {
     setResult(runSimulation(nextConfig));
     setCurrentFrame(0);
     setPlaying(false);
-    setUiMessage("Simulación cargada con datos mock · lista para reproducir");
+    setRunCount((count) => count + 1);
+    setLastRunTime(new Date());
+    setRunNotice("Simulación cargada con mock · frame reiniciado · listo para reproducir");
+    setUiMessage("Resultado mock aplicado y listo para reproducir");
   }, []);
 
   const handleConfigChange = useCallback((nextConfig: SimulationConfig) => {
@@ -167,7 +179,7 @@ export default function App() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
-        className="flex items-center justify-between px-4 py-2 border-b border-panel-border bg-obsidian/95 z-50"
+        className="topbar flex items-center justify-between px-4 py-2 border-b border-panel-border bg-obsidian/95 z-50"
       >
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 border border-hud/40 flex items-center justify-center relative">
@@ -224,10 +236,10 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="topbar-actions">
           <button
             onClick={() => setPresentationMode((value) => !value)}
-            className={`hud-mini-button ${presentationMode ? "hud-mini-button-active" : ""}`}
+            className={`hud-mini-button topbar-control ${presentationMode ? "hud-mini-button-active" : ""}`}
           >
             {presentationMode ? "SALIR PRESENTACIÓN" : "PRESENTACIÓN"}
           </button>
@@ -273,6 +285,8 @@ export default function App() {
                         config={config}
                         onConfigChange={handleConfigChange}
                         onSimulate={handleSimulate}
+                        configStatus={configStatus}
+                        runCount={runCount}
                       />
                     </motion.aside>
                   )}
@@ -296,13 +310,40 @@ export default function App() {
                 <GraphWorkspace result={result} currentFrame={safeFrame} />
               </div>
 
-              <div className="border-t border-panel-border bg-obsidian/95 px-4 py-1 flex items-center gap-3 text-[8px] tracking-[0.12em]">
-                <span className="text-cyan-glow">FUENTE: MOCK · PENDIENTE GRUPO 2</span>
-                <span className={configInvalid ? "text-danger" : configPending ? "text-warning" : "text-hud"}>
-                  CONFIG: {configStatus}
+              <AnimatePresence>
+                {runNotice && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    className="run-notice"
+                  >
+                    <span className="status-chip status-chip-ready">SIM READY</span>
+                    <span className="text-bright">{runNotice}</span>
+                    <span className="text-hud ml-auto">RUN #{runCount} · {lastRunTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="simulation-state-strip">
+                <div className="state-readout">
+                  <span>CONFIG EDITADA</span>
+                  <strong className={configInvalid ? "text-danger" : configPending ? "text-warning" : "text-mist"}>
+                    dt={config.simulation.dt}s · {configStatus}
+                  </strong>
+                </div>
+                <div className="state-readout">
+                  <span>CONFIG APLICADA</span>
+                  <strong className="text-hud">dt={result.metadata.config.simulation.dt}s · {result.metadata.integrator.toUpperCase()}</strong>
+                </div>
+                <div className="state-readout">
+                  <span>RESULTADO ACTUAL</span>
+                  <strong className="text-cyan-glow">RUN #{runCount} · MOCK · {totalFrames} FRAMES</strong>
+                </div>
+                <span className={configInvalid ? "status-chip status-chip-danger" : configPending ? "status-chip status-chip-warning" : "status-chip status-chip-ready"}>
+                  {configInvalid ? "CONFIG INVÁLIDA" : configPending ? "CONFIG PENDIENTE" : "SIM READY"}
                 </span>
-                <span className="text-mist flex-1">{uiMessage}</span>
-                <span className="text-ash">RESULTADO: {totalFrames} FRAMES</span>
+                <span className="text-mist flex-1 text-right">{uiMessage}</span>
               </div>
 
               <PlaybackBar

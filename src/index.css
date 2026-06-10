@@ -81,6 +81,19 @@ body {
   --ui-accent: var(--color-hud);
   --ui-accent-mid: var(--color-hud-mid);
   --ui-accent-dim: var(--color-hud-dim);
+  --ui-font: var(--font-mono);
+  --ui-radius: 2px;
+  --ui-panel-bg: rgba(10, 12, 16, 0.85);
+  --ui-grid-size: 48px;
+  --ui-glow-strength: 55%;
+  font-family: var(--ui-font);
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--color-hud) 4%, transparent) 0%, transparent 60%),
+    var(--color-void);
+}
+
+.ui-root[data-theme="green"] {
+  --ui-panel-bg: rgba(10, 12, 16, 0.85);
 }
 
 .ui-root[data-theme="cyan"] {
@@ -89,6 +102,11 @@ body {
   --color-hud-dim: #004466;
   --color-panel-border: rgba(0, 212, 255, 0.16);
   --color-glass-hover: rgba(0, 212, 255, 0.05);
+  --ui-font: "Segoe UI", "Inter", system-ui, sans-serif;
+  --ui-radius: 4px;
+  --ui-panel-bg: rgba(5, 15, 22, 0.88);
+  --ui-grid-size: 36px;
+  --ui-glow-strength: 38%;
 }
 
 .ui-root[data-theme="amber"] {
@@ -97,6 +115,11 @@ body {
   --color-hud-dim: #664400;
   --color-panel-border: rgba(255, 170, 0, 0.16);
   --color-glass-hover: rgba(255, 170, 0, 0.05);
+  --ui-font: "Cascadia Code", "Consolas", monospace;
+  --ui-radius: 1px;
+  --ui-panel-bg: rgba(22, 15, 5, 0.9);
+  --ui-grid-size: 52px;
+  --ui-glow-strength: 48%;
 }
 
 .ui-root[data-theme="threat"] {
@@ -105,6 +128,79 @@ body {
   --color-hud-dim: #661122;
   --color-panel-border: rgba(255, 54, 84, 0.17);
   --color-glass-hover: rgba(255, 54, 84, 0.05);
+  --ui-font: "Arial Narrow", "Segoe UI", sans-serif;
+  --ui-radius: 0px;
+  --ui-panel-bg: rgba(24, 5, 10, 0.9);
+  --ui-grid-size: 40px;
+  --ui-glow-strength: 72%;
+}
+
+.ui-root[data-theme="blueprint"] {
+  --color-void: #06101f;
+  --color-obsidian: #08182b;
+  --color-carbon: #0d2139;
+  --color-gunmetal: #12304e;
+  --color-slate-steel: #21476d;
+  --color-ash: #47749d;
+  --color-mist: #78a6ca;
+  --color-light: #a8cee8;
+  --color-bright: #e1f4ff;
+  --color-hud: #68c7ff;
+  --color-hud-mid: #3399d6;
+  --color-hud-dim: #174c70;
+  --color-panel-border: rgba(104, 199, 255, 0.2);
+  --color-glass-hover: rgba(104, 199, 255, 0.06);
+  --ui-font: "Segoe UI", "Inter", system-ui, sans-serif;
+  --ui-radius: 3px;
+  --ui-panel-bg: rgba(8, 24, 43, 0.88);
+  --ui-grid-size: 24px;
+  --ui-glow-strength: 28%;
+}
+
+.ui-root[data-theme="terminal"] {
+  --color-void: #030403;
+  --color-obsidian: #070907;
+  --color-carbon: #0b0e0b;
+  --color-gunmetal: #111611;
+  --color-slate-steel: #263126;
+  --color-ash: #485848;
+  --color-mist: #819081;
+  --color-light: #abb8ab;
+  --color-bright: #e2eadf;
+  --color-hud: #b7ff9a;
+  --color-hud-mid: #79c965;
+  --color-hud-dim: #325b2a;
+  --color-panel-border: rgba(183, 255, 154, 0.14);
+  --color-glass-hover: rgba(183, 255, 154, 0.04);
+  --ui-font: "Consolas", "Cascadia Code", monospace;
+  --ui-radius: 0px;
+  --ui-panel-bg: rgba(3, 5, 3, 0.94);
+  --ui-grid-size: 16px;
+  --ui-glow-strength: 18%;
+}
+
+.ui-root[data-theme="blueprint"] .mil-panel {
+  border-style: dashed;
+}
+
+.ui-root[data-theme="terminal"] .mil-panel::before,
+.ui-root[data-theme="terminal"] .mil-panel::after,
+.ui-root[data-theme="terminal"] .mil-corners::before,
+.ui-root[data-theme="terminal"] .mil-corners::after {
+  display: none;
+}
+
+.ui-root[data-theme="threat"] .mil-panel {
+  border-left-width: 3px;
+}
+
+.ui-root[data-theme="amber"] .workspace-toolbar,
+.ui-root[data-theme="amber"] .display-toolbar {
+  background: linear-gradient(90deg, rgba(45, 28, 5, 0.95), rgba(14, 12, 9, 0.95));
+}
+
+.ui-root .text-glow-hud {
+  text-shadow: 0 0 8px color-mix(in srgb, var(--color-hud) var(--ui-glow-strength), transparent);
 }
 
 .ui-root[data-scanlines="on"]::after {
@@ -180,6 +276,8 @@ body {
   padding: 3px 6px;
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  border-radius: var(--ui-radius);
+  line-height: 1;
 }
 
 .hud-mini-button:hover,
@@ -193,6 +291,48 @@ body {
 .hud-icon-button {
   font-size: 7px;
   padding: 2px 5px;
+  min-height: 21px;
+}
+
+.topbar {
+  min-height: 58px;
+  gap: 12px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.topbar-control,
+.topbar-actions > .hud-mini-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-height: 28px;
+  margin: 0;
+  line-height: 1;
+}
+
+.topbar-control > .hud-mini-button {
+  height: 28px;
+  min-height: 28px;
+}
+
+.ui-settings-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 80;
+  width: 272px;
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--ui-radius);
+  background: color-mix(in srgb, var(--color-obsidian) 98%, transparent);
+  padding: 12px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.42);
 }
 
 .workspace-toolbar,
@@ -220,6 +360,84 @@ body {
   letter-spacing: 0.08em;
 }
 
+.simulation-state-strip,
+.run-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--color-panel-border);
+  background: color-mix(in srgb, var(--color-obsidian) 96%, transparent);
+  padding: 5px 16px;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+.run-notice {
+  border-top-color: color-mix(in srgb, var(--color-hud) 45%, transparent);
+  background: color-mix(in srgb, var(--color-hud) 7%, var(--color-obsidian));
+}
+
+.state-readout {
+  display: flex;
+  flex-direction: column;
+  min-width: 155px;
+  padding-right: 12px;
+  border-right: 1px solid var(--color-slate-steel);
+}
+
+.state-readout > span {
+  color: var(--color-ash);
+  font-size: 7px;
+}
+
+.state-readout > strong {
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  white-space: nowrap;
+  border: 1px solid var(--color-slate-steel);
+  padding: 2px 7px;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  border-radius: var(--ui-radius);
+}
+
+.status-chip-ready {
+  color: var(--color-hud);
+  border-color: color-mix(in srgb, var(--color-hud) 38%, transparent);
+  background: color-mix(in srgb, var(--color-hud) 7%, transparent);
+}
+
+.status-chip-warning {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 40%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 7%, transparent);
+}
+
+.status-chip-danger {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 42%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 7%, transparent);
+}
+
+@keyframes execute-attention {
+  0%, 100% { box-shadow: 0 0 0 color-mix(in srgb, var(--color-warning) 0%, transparent); }
+  50% { box-shadow: 0 0 18px color-mix(in srgb, var(--color-warning) 25%, transparent); }
+}
+
+.execute-attention {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+  animation: execute-attention 1.8s ease-in-out infinite;
+}
+
 @media (max-width: 1100px) {
   .result-inspector {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -231,6 +449,23 @@ body {
 
   .display-toolbar .text-mist {
     display: none;
+  }
+
+  .simulation-state-strip,
+  .run-notice {
+    flex-wrap: wrap;
+  }
+
+  .state-readout {
+    min-width: 135px;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+  }
+
+  .topbar-actions {
+    margin-left: auto;
   }
 }
 
@@ -255,9 +490,9 @@ body {
 
 /*Military Panel  */
 .mil-panel {
-  background: var(--color-glass);
+  background: var(--ui-panel-bg, var(--color-glass));
   border: 1px solid var(--color-panel-border);
-  border-radius: 2px;
+  border-radius: var(--ui-radius, 2px);
   position: relative;
 }
 
@@ -721,9 +956,9 @@ label {
 /* Grid Background Pattern  */
 .tactical-grid {
   background-image:
-    linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
-  background-size: 48px 48px;
+    linear-gradient(color-mix(in srgb, var(--color-hud) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-hud) 3%, transparent) 1px, transparent 1px);
+  background-size: var(--ui-grid-size, 48px) var(--ui-grid-size, 48px);
 }
 
 .tactical-grid-dense {
