@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export type UiTheme = "green" | "cyan" | "amber" | "threat" | "blueprint" | "terminal";
+export type UiTheme = "green" | "cyan" | "amber" | "threat" | "blueprint" | "terminal" | "militaryNight" | "naval" | "desert" | "contrast";
 export type UiDensity = "compact" | "normal" | "presentation";
 export type PanelStyle = "tactical" | "glass" | "blueprint" | "crt" | "minimal" | "alert";
 export type GridIntensity = "low" | "medium" | "high";
@@ -30,8 +30,12 @@ const themes: { value: UiTheme; label: string }[] = [
   { value: "cyan", label: "CIAN RADAR" },
   { value: "amber", label: "ÁMBAR CABINA" },
   { value: "threat", label: "ROJO AMENAZA" },
-  { value: "blueprint", label: "BLUEPRINT AZUL" },
+  { value: "blueprint", label: "PLANO AZUL" },
   { value: "terminal", label: "TERMINAL TÁCTICA" },
+  { value: "militaryNight", label: "NOCTURNO MILITAR" },
+  { value: "naval", label: "RADAR NAVAL" },
+  { value: "desert", label: "DESIERTO TÁCTICO" },
+  { value: "contrast", label: "ALTO CONTRASTE" },
 ];
 
 export default function UiSettingsPanel({
@@ -69,7 +73,7 @@ export default function UiSettingsPanel({
           </select>
 
           <div className="mil-divider my-3" />
-          <label>DENSIDAD DE WORKSPACE</label>
+          <label>DENSIDAD DEL ÁREA DE TRABAJO</label>
           <div className="grid grid-cols-3 gap-1">
             {(["compact", "normal", "presentation"] as UiDensity[]).map((density) => (
               <button
@@ -86,7 +90,7 @@ export default function UiSettingsPanel({
           <select value={settings.panelStyle} onChange={(event) => patch({ panelStyle: event.target.value as PanelStyle })}>
             <option value="tactical">TÁCTICO</option>
             <option value="glass">CRISTAL</option>
-            <option value="blueprint">BLUEPRINT</option>
+            <option value="blueprint">PLANO TÉCNICO</option>
             <option value="crt">CRT</option>
             <option value="minimal">MINIMAL</option>
             <option value="alert">ALERTA</option>
@@ -125,7 +129,7 @@ function Toggle({ label, enabled, onChange }: { label: string; enabled: boolean;
       aria-pressed={enabled}
     >
       {label}
-      <span className={enabled ? "text-hud" : "text-ash"}>{enabled ? "ON" : "OFF"}</span>
+      <span className={enabled ? "text-hud" : "text-ash"}>{enabled ? "ACTIVO" : "INACTIVO"}</span>
     </button>
   );
 }

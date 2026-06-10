@@ -193,8 +193,8 @@ function SelectField<T extends string>({ label, value, onChange, options }: Sele
 
 //Options
 const GUIDANCE_OPTIONS: { value: GuidanceLaw; label: string }[] = [
-  { value: "pure_pursuit", label: "PURE PURSUIT (PP)" },
-  { value: "proportional_nav", label: "PROPORTIONAL NAV (PN)" },
+  { value: "pure_pursuit", label: "PERSECUCIÓN PURA (PP)" },
+  { value: "proportional_nav", label: "NAVEGACIÓN PROPORCIONAL (PN)" },
 ];
 
 const MANEUVER_OPTIONS: { value: ManeuverType; label: string }[] = [
@@ -415,7 +415,7 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
 
         {/*WEAPON (Missile) */}
         <Section
-          title="WEAPON · MISIL"
+          title="ARMA · MISIL"
           code="WPN"
           accentColor="cyan"
           onReset={() => {

@@ -34,6 +34,7 @@ interface GraphWorkspaceProps {
   onEvent?: (message: string) => void;
   demoSignal?: number;
   focusSignal?: number;
+  layoutSignal?: number;
   escapeSignal?: number;
   resetSignal?: number;
   inspectorSignal?: number;
@@ -78,7 +79,7 @@ const displayInfo: Record<DisplayId, {
   },
 };
 
-export default function GraphWorkspace({ result, currentFrame, onEvent, demoSignal = 0, focusSignal = 0, escapeSignal = 0, resetSignal = 0, inspectorSignal = 0, cleanSignal = 0 }: GraphWorkspaceProps) {
+export default function GraphWorkspace({ result, currentFrame, onEvent, demoSignal = 0, focusSignal = 0, layoutSignal = 0, escapeSignal = 0, resetSignal = 0, inspectorSignal = 0, cleanSignal = 0 }: GraphWorkspaceProps) {
   const [initialPrefs] = useState(loadWorkspacePrefs);
   const [order, setOrder] = useState<DisplayId[]>(initialPrefs.order);
   const [visible, setVisible] = useState<Record<DisplayId, boolean>>(initialPrefs.visible);
@@ -87,6 +88,7 @@ export default function GraphWorkspace({ result, currentFrame, onEvent, demoSign
   const [showInspector, setShowInspector] = useState(initialPrefs.showInspector);
   const [showToolbar, setShowToolbar] = useState(initialPrefs.showToolbar);
   const [dragging, setDragging] = useState<DisplayId | null>(null);
+  const [dropTarget, setDropTarget] = useState<DisplayId | null>(null);
 
   const visibleDisplays = order.filter((id) => visible[id]);
   const primaryLengths = [
@@ -117,8 +119,20 @@ export default function GraphWorkspace({ result, currentFrame, onEvent, demoSign
 
   useEffect(() => {
     if (focusSignal === 0) return;
-    setFocused((current) => current ?? order.find((id) => visible[id]) ?? null);
+    setFocused((current) => {
+      const visibleIds = order.filter((id) => visible[id]);
+      if (visibleIds.length === 0) return null;
+      if (visibleIds.length === 1) return current === visibleIds[0] ? null : visibleIds[0];
+      const currentIndex = current ? visibleIds.indexOf(current) : -1;
+      return visibleIds[(currentIndex + 1) % visibleIds.length];
+    });
   }, [focusSignal]);
+
+  useEffect(() => {
+    if (layoutSignal === 0) return;
+    setFocused(null);
+    setLayout((current) => current === "balanced" ? "threeLarge" : current === "threeLarge" ? "distanceLarge" : "balanced");
+  }, [layoutSignal]);
 
   useEffect(() => {
     if (escapeSignal === 0) return;
@@ -180,12 +194,14 @@ export default function GraphWorkspace({ result, currentFrame, onEvent, demoSign
   const dropOn = (target: DisplayId) => {
     if (!dragging || dragging === target) return;
     setOrder((current) => {
+      const targetIndex = current.indexOf(target);
       const next = current.filter((id) => id !== dragging);
-      next.splice(next.indexOf(target), 0, dragging);
+      next.splice(targetIndex, 0, dragging);
       return next;
     });
     onEvent?.(`Visor reordenado: ${displayInfo[dragging].code}`);
     setDragging(null);
+    setDropTarget(null);
   };
 
   const copySummary = async () => {
@@ -266,7 +282,7 @@ export default function GraphWorkspace({ result, currentFrame, onEvent, demoSign
         </div>
       )}
 
-      <div className={`flex-1 min-h-0 p-3 grid gap-2 overflow-hidden ${workspaceClass}`}>
+      <div className={`workspace-grid flex-1 min-h-0 p-3 grid gap-2 overflow-hidden ${workspaceClass}`}>
         {visibleDisplays.map((id) => {
           if (focused && focused !== id) return null;
           const info = displayInfo[id];
@@ -277,10 +293,14 @@ export default function GraphWorkspace({ result, currentFrame, onEvent, demoSign
               key={id}
               draggable
               onDragStart={() => setDragging(id)}
-              onDragEnd={() => setDragging(null)}
+              onDragEnd={() => {
+                setDragging(null);
+                setDropTarget(null);
+              }}
+              onDragEnter={() => setDropTarget(id)}
               onDragOver={(event) => event.preventDefault()}
               onDrop={() => dropOn(id)}
-              className={`mil-panel ${info.panelClass} p-0 flex flex-col min-h-0 relative ${spanClass} ${dragging === id ? "display-dragging" : ""}`}
+              className={`mil-panel ${info.panelClass} p-0 flex flex-col min-h-0 relative ${spanClass} ${dragging === id ? "display-dragging" : ""} ${dropTarget === id && dragging !== id ? "display-drop-target" : ""}`}
             >
               <div className="mil-corners flex flex-col min-h-0 h-full">
                 <div className="display-toolbar">

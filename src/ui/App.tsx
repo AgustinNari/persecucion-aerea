@@ -82,11 +82,12 @@ export default function App() {
   const [missionEvents, setMissionEvents] = useState<MissionEvent[]>([]);
   const [demoSignal, setDemoSignal] = useState(0);
   const [focusSignal, setFocusSignal] = useState(0);
+  const [layoutSignal, setLayoutSignal] = useState(0);
   const [escapeSignal, setEscapeSignal] = useState(0);
   const [resetWorkspaceSignal, setResetWorkspaceSignal] = useState(0);
   const [inspectorSignal, setInspectorSignal] = useState(0);
   const [cleanSignal, setCleanSignal] = useState(0);
-  const [logSignal, setLogSignal] = useState(0);
+  const [missionLogOpen, setMissionLogOpen] = useState(false);
   const [closePanelsSignal, setClosePanelsSignal] = useState(0);
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [showStatusPanel, setShowStatusPanel] = useState(true);
@@ -97,6 +98,8 @@ export default function App() {
   const eventIdRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const endNotifiedRef = useRef(false);
+  const lastConfigLogRef = useRef("");
+  const lastLoggedSeekRef = useRef(-999);
 
   const totalFrames = result.time.length;
   const lastFrame = Math.max(0, totalFrames - 1);
@@ -146,9 +149,9 @@ export default function App() {
   }, []);
 
   const handleUiEvent = useCallback((message: string) => {
-    addEvent(message);
+    setActionToast(message);
     playTone(message.includes("oculto") || message.includes("cerrad") ? 300 : 520, 0.045);
-  }, [addEvent, playTone]);
+  }, [playTone]);
 
   useEffect(() => {
     setCurrentFrame((frame) => clampFrame(frame, lastFrame));
@@ -232,6 +235,8 @@ export default function App() {
     setResult(runSimulation(nextConfig));
     setCurrentFrame(0);
     setPlaying(false);
+    lastConfigLogRef.current = "";
+    lastLoggedSeekRef.current = -999;
     setRunCount((count) => count + 1);
     setLastRunTime(new Date());
     setRunNotice("Simulación cargada con mock · frame reiniciado · listo para reproducir");
@@ -250,7 +255,11 @@ export default function App() {
         ? "Corregí la configuración antes de reproducir"
         : "Ejecutá la simulación para aplicar cambios",
     );
-    addEvent(invalid ? `Config inválida: ${errors[0]}` : "Configuración modificada · requiere ejecutar", invalid ? "warning" : "info", false);
+    const logMessage = invalid ? `Config inválida: ${errors[0]}` : "Configuración modificada · requiere ejecutar";
+    if (lastConfigLogRef.current !== logMessage) {
+      lastConfigLogRef.current = logMessage;
+      addEvent(logMessage, invalid ? "warning" : "info", false);
+    }
     if (invalid) playTone(180, 0.09);
   }, [addEvent, playTone]);
 
@@ -282,27 +291,31 @@ export default function App() {
   }, [addEvent, playTone]);
 
   const handleSeek = useCallback((frame: number) => {
-    setCurrentFrame(clampFrame(frame, lastFrame));
+    const nextFrame = clampFrame(frame, lastFrame);
+    setCurrentFrame(nextFrame);
     setPlaying(false);
-    addEvent(`Frame seek: ${clampFrame(frame, lastFrame)}/${lastFrame}`, "info", false);
+    if (nextFrame === 0 || nextFrame === lastFrame || Math.abs(nextFrame - lastLoggedSeekRef.current) >= 5) {
+      lastLoggedSeekRef.current = nextFrame;
+      addEvent(`Frame seleccionado: ${nextFrame}/${lastFrame}`, "info", false);
+    }
   }, [addEvent, lastFrame]);
 
   const handleSpeedChange = useCallback((nextSpeed: number) => {
     setSpeed(nextSpeed);
-    addEvent(`Velocidad de reproducción: ${nextSpeed}×`, "info", false);
+    setActionToast(`Velocidad de reproducción: ${nextSpeed}×`);
     playTone(440 + nextSpeed * 40, 0.04);
-  }, [addEvent, playTone]);
+  }, [playTone]);
 
   const handlePresentationMode = useCallback((enabled: boolean) => {
     setPresentationMode(enabled);
-    addEvent(`${enabled ? "Modo presentación activado" : "Modo presentación desactivado"}`);
-  }, [addEvent]);
+    setActionToast(enabled ? "Modo presentación activado" : "Modo presentación desactivado");
+  }, []);
 
   const handleUiSettingsChange = useCallback((next: UiSettings) => {
-    if (next.theme !== uiSettings.theme) addEvent(`Tema cambiado: ${next.theme}`);
-    if (next.sound !== uiSettings.sound) addEvent(`Sonido UI ${next.sound ? "activado" : "silenciado"}`);
+    if (next.theme !== uiSettings.theme) setActionToast(`Tema cambiado: ${next.theme}`);
+    if (next.sound !== uiSettings.sound) setActionToast(`Sonido UI ${next.sound ? "activado" : "silenciado"}`);
     setUiSettings(next);
-  }, [addEvent, uiSettings]);
+  }, [uiSettings]);
 
   const handleDemoMode = useCallback(() => {
     setPresentationMode(true);
@@ -320,8 +333,9 @@ export default function App() {
     setShowStateStrip(false);
     setClosePanelsSignal((signal) => signal + 1);
     setCleanSignal((signal) => signal + 1);
-    addEvent("Vista limpia activada", "success");
-  }, [addEvent]);
+    setMissionLogOpen(false);
+    setActionToast("Vista limpia activada");
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -345,8 +359,10 @@ export default function App() {
         handlePresentationMode(!presentationMode);
       } else if (event.key.toLowerCase() === "f") {
         setFocusSignal((signal) => signal + 1);
+      } else if (event.key.toLowerCase() === "g") {
+        setLayoutSignal((signal) => signal + 1);
       } else if (event.key.toLowerCase() === "l") {
-        setLogSignal((signal) => signal + 1);
+        setMissionLogOpen((open) => !open);
       } else if (event.key.toLowerCase() === "i") {
         setInspectorSignal((signal) => signal + 1);
       } else if (event.key.toLowerCase() === "m") {
@@ -357,6 +373,7 @@ export default function App() {
         setPresentationMode(false);
         setEscapeSignal((signal) => signal + 1);
         setClosePanelsSignal((signal) => signal + 1);
+        setMissionLogOpen(false);
         setShowShortcutHelp(false);
         setActionToast(null);
       }
@@ -395,7 +412,7 @@ export default function App() {
               </div>
               {[
                 ["ESPACIO", "Reproducir / pausar"], ["R", "Reiniciar"], ["A / ←", "Retroceder 5 frames"],
-                ["D / →", "Avanzar 5 frames"], ["F", "Enfocar visor"], ["P", "Modo presentación"],
+                ["D / →", "Avanzar 5 frames"], ["F", "Recorrer foco de visores"], ["G", "Cambiar distribución"], ["P", "Modo presentación"],
                 ["L", "Abrir/cerrar bitácora"], ["I", "Abrir/cerrar inspector"], ["M", "Activar/silenciar sonido"],
                 ["H", "Mostrar esta ayuda"], ["ESC", "Cerrar paneles y salir de foco"],
               ].map(([key, label]) => <div key={key} className="shortcut-row"><kbd>{key}</kbd><span>{label}</span></div>)}
@@ -489,7 +506,7 @@ export default function App() {
                 localStorage.removeItem("taccon-ui-settings");
                 localStorage.removeItem("taccon-workspace-prefs");
               } catch {}
-              addEvent("Preferencias UI restablecidas", "success");
+              setActionToast("Preferencias UI restablecidas");
             }}
             closeSignal={closePanelsSignal}
           />
@@ -532,7 +549,7 @@ export default function App() {
                         onSimulate={handleSimulate}
                         configStatus={configStatus}
                         runCount={runCount}
-                        onEvent={handleUiEvent}
+                        onEvent={addEvent}
                       />
                     </motion.aside>
                   )}
@@ -560,6 +577,7 @@ export default function App() {
                   onEvent={handleUiEvent}
                   demoSignal={demoSignal}
                   focusSignal={focusSignal}
+                  layoutSignal={layoutSignal}
                   escapeSignal={escapeSignal}
                   resetSignal={resetWorkspaceSignal}
                   inspectorSignal={inspectorSignal}
@@ -625,7 +643,7 @@ export default function App() {
               <div className="secondary-controls">
                 <button onClick={() => setShowStateStrip((value) => !value)} className="hud-mini-button">RESUMEN</button>
                 <button onClick={() => setShowTimeline((value) => !value)} className="hud-mini-button">LÍNEA DE TIEMPO</button>
-                <button onClick={() => setLogSignal((signal) => signal + 1)} className="hud-mini-button">BITÁCORA</button>
+                <button onClick={() => setMissionLogOpen((open) => !open)} className="hud-mini-button">BITÁCORA</button>
               </div>
             </motion.div>
           ) : (
@@ -677,12 +695,8 @@ export default function App() {
       <MissionLog
         events={missionEvents}
         onClear={() => setMissionEvents([])}
-        toggleSignal={logSignal}
-        closeSignal={closePanelsSignal}
-        onToggle={(open) => {
-          addEvent(`Bitácora ${open ? "abierta" : "cerrada"}`, "info", false);
-          playTone(open ? 500 : 300);
-        }}
+        open={missionLogOpen}
+        onOpenChange={setMissionLogOpen}
       />
       </div>
     </MotionConfig>

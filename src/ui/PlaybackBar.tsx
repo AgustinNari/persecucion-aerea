@@ -129,7 +129,7 @@ export default function PlaybackBar({
             }`}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          title={disabled ? disabledReason : playing ? "PAUSE" : "EXECUTE"}
+          title={disabled ? disabledReason : playing ? "PAUSAR" : "REPRODUCIR"}
           aria-disabled={disabled}
         >
           {playing ? (
