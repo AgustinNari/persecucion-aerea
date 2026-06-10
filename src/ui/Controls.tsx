@@ -200,7 +200,7 @@ const GUIDANCE_OPTIONS: { value: GuidanceLaw; label: string }[] = [
 const MANEUVER_OPTIONS: { value: ManeuverType; label: string }[] = [
   { value: "straight", label: "RECTA (SIN MANIOBRA)" },
   { value: "constant_turn", label: "VIRAJE CONSTANTE" },
-  { value: "weave", label: "SERPENTEO (WEAVE)" },
+  { value: "weave", label: "SERPENTEO" },
   { value: "reactive_evade", label: "EVASIÓN REACTIVA" },
 ];
 
@@ -311,7 +311,8 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
     }
 
     onConfigChange(next);
-    onEvent?.(`Preset cargado: ${preset}`);
+    const presetLabel = preset === "pn" ? "navegación proporcional" : preset === "pursuit" ? "persecución pura" : "serpenteo";
+    onEvent?.(`Preajuste cargado: ${presetLabel}`);
   }, [onConfigChange, onEvent]);
 
   const handleSimulate = useCallback(() => {
@@ -334,12 +335,12 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
       <div className="flex-1 overflow-y-auto">
         {/* TARGET (Aircraft) */}
         <Section
-          title="TARGET · AVIÓN"
-          code="TGT"
+          title="OBJETIVO · AVIÓN"
+          code="OBJ"
           accentColor="amber"
           onReset={() => {
             onConfigChange({ ...config, aircraft: structuredClone(mockConfig.aircraft) });
-            onEvent?.("Aircraft config reset");
+            onEvent?.("Configuración del avión restablecida");
           }}
         >
           <Vec3Field
@@ -395,14 +396,14 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
                 className="overflow-hidden space-y-2.5"
               >
                 <NumberField
-                  label="AMPLITUD WEAVE"
+                  label="AMPLITUD DE SERPENTEO"
                   value={config.aircraft.maneuverParams?.weaveAmp ?? 95}
                   onChange={(v) => updateManeuverParams({ weaveAmp: v })}
                   step={5}
                   unit="m/s²"
                 />
                 <NumberField
-                  label="FRECUENCIA WEAVE"
+                  label="FRECUENCIA DE SERPENTEO"
                   value={config.aircraft.maneuverParams?.weaveFreq ?? 2.3}
                   onChange={(v) => updateManeuverParams({ weaveFreq: v })}
                   step={0.1}
@@ -416,11 +417,11 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
         {/*WEAPON (Missile) */}
         <Section
           title="ARMA · MISIL"
-          code="WPN"
+          code="MSL"
           accentColor="cyan"
           onReset={() => {
             onConfigChange({ ...config, missile: structuredClone(mockConfig.missile) });
-            onEvent?.("Missile config reset");
+            onEvent?.("Configuración del misil restablecida");
           }}
         >
           <Vec3Field
@@ -480,7 +481,7 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
           defaultOpen={false}
           onReset={() => {
             onConfigChange({ ...config, simulation: structuredClone(mockConfig.simulation) });
-            onEvent?.("Simulation params reset");
+            onEvent?.("Parámetros de simulación restablecidos");
           }}
         >
           <NumberField
@@ -536,7 +537,7 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
           </button>
           <button onClick={() => {
             onConfigChange(cloneConfig(mockConfig));
-            onEvent?.("Global config reset");
+            onEvent?.("Configuración global restablecida");
           }} className="btn btn-ghost !px-1 !py-1.5 !text-[8px]">
             RESTAURAR TODO
           </button>

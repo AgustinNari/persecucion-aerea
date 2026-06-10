@@ -26,9 +26,27 @@ const DEFAULT_UI_SETTINGS: UiSettings = {
   gridIntensity: "medium",
 };
 
+const VALID_UI_SETTINGS = {
+  theme: ["green", "cyan", "amber", "threat", "blueprint", "terminal", "militaryNight", "naval", "desert", "contrast", "skyOps", "lightHangar", "tacticalMap", "laboratory"],
+  density: ["compact", "normal", "presentation"],
+  panelStyle: ["tactical", "glass", "blueprint", "crt", "minimal", "alert"],
+  gridIntensity: ["low", "medium", "high"],
+} as const;
+
 function loadUiSettings(): UiSettings {
   try {
-    return { ...DEFAULT_UI_SETTINGS, ...JSON.parse(localStorage.getItem("taccon-ui-settings") ?? "{}") };
+    const saved = JSON.parse(localStorage.getItem("taccon-ui-settings") ?? "{}") as Partial<UiSettings>;
+    return {
+      ...DEFAULT_UI_SETTINGS,
+      theme: VALID_UI_SETTINGS.theme.includes(saved.theme as UiSettings["theme"]) ? saved.theme as UiSettings["theme"] : DEFAULT_UI_SETTINGS.theme,
+      density: VALID_UI_SETTINGS.density.includes(saved.density as UiSettings["density"]) ? saved.density as UiSettings["density"] : DEFAULT_UI_SETTINGS.density,
+      panelStyle: VALID_UI_SETTINGS.panelStyle.includes(saved.panelStyle as UiSettings["panelStyle"]) ? saved.panelStyle as UiSettings["panelStyle"] : DEFAULT_UI_SETTINGS.panelStyle,
+      gridIntensity: VALID_UI_SETTINGS.gridIntensity.includes(saved.gridIntensity as UiSettings["gridIntensity"]) ? saved.gridIntensity as UiSettings["gridIntensity"] : DEFAULT_UI_SETTINGS.gridIntensity,
+      scanlines: typeof saved.scanlines === "boolean" ? saved.scanlines : DEFAULT_UI_SETTINGS.scanlines,
+      glow: typeof saved.glow === "boolean" ? saved.glow : DEFAULT_UI_SETTINGS.glow,
+      reducedMotion: typeof saved.reducedMotion === "boolean" ? saved.reducedMotion : DEFAULT_UI_SETTINGS.reducedMotion,
+      sound: typeof saved.sound === "boolean" ? saved.sound : DEFAULT_UI_SETTINGS.sound,
+    };
   } catch {
     return DEFAULT_UI_SETTINGS;
   }
@@ -286,7 +304,7 @@ export default function App() {
   const handleRestart = useCallback(() => {
     setCurrentFrame(0);
     setPlaying(false);
-    addEvent("Timeline reiniciada · frame 0");
+    addEvent("Línea de tiempo reiniciada · frame 0");
     playTone(420);
   }, [addEvent, playTone]);
 
@@ -312,7 +330,7 @@ export default function App() {
   }, []);
 
   const handleUiSettingsChange = useCallback((next: UiSettings) => {
-    if (next.theme !== uiSettings.theme) setActionToast(`Tema cambiado: ${next.theme}`);
+    if (next.theme !== uiSettings.theme) setActionToast("Tema visual actualizado");
     if (next.sound !== uiSettings.sound) setActionToast(`Sonido UI ${next.sound ? "activado" : "silenciado"}`);
     setUiSettings(next);
   }, [uiSettings]);
@@ -322,7 +340,7 @@ export default function App() {
     setCurrentFrame(0);
     setPlaying(false);
     setDemoSignal((signal) => signal + 1);
-    setUiMessage("Demo lista · presioná Play para iniciar");
+    setUiMessage("Demo lista · presioná Reproducir para iniciar");
     addEvent("Modo demo listo · todos los visores · frame 0", "success");
   }, [addEvent]);
 
@@ -491,7 +509,7 @@ export default function App() {
           <button onClick={handleDemoMode} className="hud-mini-button topbar-control" title="Preparar pantalla para demo">
             MODO DEMO
           </button>
-          <button onClick={handleCleanView} className="hud-mini-button topbar-control" title="Dejar workspace, KPIs y timeline">
+          <button onClick={handleCleanView} className="hud-mini-button topbar-control" title="Dejar área de visores, indicadores y línea de tiempo">
             VISTA LIMPIA
           </button>
           <UiSettingsPanel
@@ -643,7 +661,6 @@ export default function App() {
               <div className="secondary-controls">
                 <button onClick={() => setShowStateStrip((value) => !value)} className="hud-mini-button">RESUMEN</button>
                 <button onClick={() => setShowTimeline((value) => !value)} className="hud-mini-button">LÍNEA DE TIEMPO</button>
-                <button onClick={() => setMissionLogOpen((open) => !open)} className="hud-mini-button">BITÁCORA</button>
               </div>
             </motion.div>
           ) : (

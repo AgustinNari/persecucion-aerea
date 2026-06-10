@@ -214,7 +214,7 @@ export default function PlaybackBar({
 
       {/* Speed selector */}
       <div className="flex items-center gap-px">
-        <span className="text-[8px] text-mist tracking-[0.15em] mr-1">SPD</span>
+        <span className="text-[8px] text-mist tracking-[0.15em] mr-1">VEL</span>
         {speedPresets.map((s) => (
           <motion.button
             key={s}

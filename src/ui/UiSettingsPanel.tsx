@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export type UiTheme = "green" | "cyan" | "amber" | "threat" | "blueprint" | "terminal" | "militaryNight" | "naval" | "desert" | "contrast";
+export type UiTheme = "green" | "cyan" | "amber" | "threat" | "blueprint" | "terminal" | "militaryNight" | "naval" | "desert" | "contrast" | "skyOps" | "lightHangar" | "tacticalMap" | "laboratory";
 export type UiDensity = "compact" | "normal" | "presentation";
 export type PanelStyle = "tactical" | "glass" | "blueprint" | "crt" | "minimal" | "alert";
 export type GridIntensity = "low" | "medium" | "high";
@@ -36,6 +36,10 @@ const themes: { value: UiTheme; label: string }[] = [
   { value: "naval", label: "RADAR NAVAL" },
   { value: "desert", label: "DESIERTO TÁCTICO" },
   { value: "contrast", label: "ALTO CONTRASTE" },
+  { value: "skyOps", label: "CIELO OPERATIVO" },
+  { value: "lightHangar", label: "HANGAR CLARO" },
+  { value: "tacticalMap", label: "MAPA TÁCTICO" },
+  { value: "laboratory", label: "LABORATORIO CLARO" },
 ];
 
 export default function UiSettingsPanel({
@@ -108,8 +112,8 @@ export default function UiSettingsPanel({
           <div className="mil-divider my-3" />
           <label>EFECTOS Y PRESENTACIÓN</label>
           <div className="space-y-1">
-            <Toggle label="SCANLINES" enabled={settings.scanlines} onChange={(scanlines) => patch({ scanlines })} />
-            <Toggle label="EFECTOS / GLOW" enabled={settings.glow} onChange={(glow) => patch({ glow })} />
+            <Toggle label="LÍNEAS CRT" enabled={settings.scanlines} onChange={(scanlines) => patch({ scanlines })} />
+            <Toggle label="EFECTOS / RESPLANDOR" enabled={settings.glow} onChange={(glow) => patch({ glow })} />
             <Toggle label="ANIMACIÓN REDUCIDA" enabled={settings.reducedMotion} onChange={(reducedMotion) => patch({ reducedMotion })} />
             <Toggle label="SONIDO UI" enabled={settings.sound} onChange={(sound) => patch({ sound })} />
             <Toggle label="MODO PRESENTACIÓN" enabled={presentationMode} onChange={onPresentationModeChange} />

@@ -242,6 +242,103 @@ body {
   --ui-glow-strength: 12%;
 }
 
+.ui-root[data-theme="skyOps"] {
+  --color-void: #dcebf5;
+  --color-obsidian: #f7fbfe;
+  --color-carbon: #eaf3f8;
+  --color-gunmetal: #d6e5ee;
+  --color-slate-steel: #9bb3c2;
+  --color-ash: #587286;
+  --color-mist: #304f66;
+  --color-light: #18384e;
+  --color-bright: #08293f;
+  --color-hud: #006fa8;
+  --color-hud-mid: #168fc3;
+  --color-hud-dim: #8ec9e2;
+  --color-warning: #9b6500;
+  --color-danger: #b5263f;
+  --color-panel-border: rgba(19, 84, 120, 0.28);
+  --color-glass-hover: rgba(0, 111, 168, 0.08);
+  --font-mono: "Segoe UI", "Arial", system-ui, sans-serif;
+  --ui-font: "Segoe UI", "Arial", system-ui, sans-serif;
+  --ui-radius: 7px;
+  --ui-panel-bg: rgba(248, 252, 255, 0.88);
+  --ui-grid-size: 40px;
+  --ui-glow-strength: 5%;
+}
+
+.ui-root[data-theme="lightHangar"] {
+  --color-void: #e4e7e8;
+  --color-obsidian: #f8f9f9;
+  --color-carbon: #eef0f1;
+  --color-gunmetal: #d8dcde;
+  --color-slate-steel: #a5adb1;
+  --color-ash: #687278;
+  --color-mist: #39474f;
+  --color-light: #26343b;
+  --color-bright: #111b20;
+  --color-hud: #315f70;
+  --color-hud-mid: #4c7987;
+  --color-hud-dim: #abc3ca;
+  --color-warning: #986000;
+  --color-danger: #ae3040;
+  --color-panel-border: rgba(44, 63, 72, 0.3);
+  --font-mono: "Bahnschrift", "Arial Narrow", "Segoe UI", sans-serif;
+  --ui-font: "Bahnschrift", "Arial Narrow", "Segoe UI", sans-serif;
+  --ui-radius: 2px;
+  --ui-panel-bg: rgba(250, 251, 251, 0.94);
+  --ui-grid-size: 64px;
+  --ui-glow-strength: 0%;
+}
+
+.ui-root[data-theme="tacticalMap"] {
+  --color-void: #d9d6b9;
+  --color-obsidian: #f0edd2;
+  --color-carbon: #e5e1c4;
+  --color-gunmetal: #d2cfad;
+  --color-slate-steel: #9d9b77;
+  --color-ash: #706f50;
+  --color-mist: #4e5536;
+  --color-light: #354027;
+  --color-bright: #202b18;
+  --color-hud: #416b35;
+  --color-hud-mid: #688653;
+  --color-hud-dim: #b1bc8e;
+  --color-warning: #8b5a13;
+  --color-danger: #a6362b;
+  --color-panel-border: rgba(70, 83, 45, 0.32);
+  --font-mono: "Cascadia Mono", "Consolas", monospace;
+  --ui-font: "Cascadia Mono", "Consolas", monospace;
+  --ui-radius: 0px;
+  --ui-panel-bg: rgba(242, 239, 211, 0.9);
+  --ui-grid-size: 24px;
+  --ui-glow-strength: 2%;
+}
+
+.ui-root[data-theme="laboratory"] {
+  --color-void: #f2f4f6;
+  --color-obsidian: #ffffff;
+  --color-carbon: #f7f8f9;
+  --color-gunmetal: #e8ecef;
+  --color-slate-steel: #bac4cb;
+  --color-ash: #74838d;
+  --color-mist: #40545f;
+  --color-light: #263c48;
+  --color-bright: #102d3b;
+  --color-hud: #006b78;
+  --color-hud-mid: #168895;
+  --color-hud-dim: #a2d0d4;
+  --color-warning: #8b6200;
+  --color-danger: #b12643;
+  --color-panel-border: rgba(38, 74, 88, 0.22);
+  --font-mono: "Segoe UI", "Inter", system-ui, sans-serif;
+  --ui-font: "Segoe UI", "Inter", system-ui, sans-serif;
+  --ui-radius: 4px;
+  --ui-panel-bg: rgba(255, 255, 255, 0.96);
+  --ui-grid-size: 32px;
+  --ui-glow-strength: 0%;
+}
+
 .ui-root[data-theme="blueprint"] .mil-panel {
   border-style: dashed;
 }
@@ -422,6 +519,96 @@ body {
 .ui-root[data-panel-style="minimal"] .result-inspector {
   background: var(--color-void);
   border-color: transparent;
+}
+
+.ui-root:is([data-theme="skyOps"], [data-theme="lightHangar"], [data-theme="tacticalMap"], [data-theme="laboratory"]) {
+  --color-cyan-glow: #006b8f;
+  --color-cyan-mid: #25839f;
+  --color-cyan-dim: #a5cbd6;
+  --color-amber-glow: #875800;
+  --color-amber-mid: #a47520;
+  --color-amber-dim: #d8c494;
+  --color-threat: #ad2940;
+  --color-threat-mid: #c64a5e;
+  --color-threat-dim: #e5b6bf;
+  --color-success: #28703e;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-hud) 5%, transparent), transparent 42%),
+    var(--color-void);
+  color: var(--color-light);
+}
+
+.ui-root:is([data-theme="skyOps"], [data-theme="lightHangar"], [data-theme="tacticalMap"], [data-theme="laboratory"])::after {
+  opacity: 0.3;
+}
+
+.ui-root:is([data-theme="skyOps"], [data-theme="lightHangar"], [data-theme="tacticalMap"], [data-theme="laboratory"]) :is(.topbar, .workspace-toolbar, .display-toolbar, .result-inspector) {
+  background: color-mix(in srgb, var(--color-obsidian) 94%, var(--color-hud) 6%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.72), 0 3px 10px rgba(36, 60, 72, 0.08);
+}
+
+.ui-root:is([data-theme="skyOps"], [data-theme="lightHangar"], [data-theme="tacticalMap"], [data-theme="laboratory"]) :is(.mission-log, .secondary-controls, .simulation-state-strip, .run-notice) {
+  background: color-mix(in srgb, var(--color-obsidian) 96%, var(--color-hud) 4%);
+}
+
+.ui-root:is([data-theme="skyOps"], [data-theme="lightHangar"], [data-theme="tacticalMap"], [data-theme="laboratory"]) :is(.mil-panel, .ui-settings-popover, .shortcut-help-panel) {
+  box-shadow: 0 5px 16px rgba(42, 62, 72, 0.1);
+}
+
+.ui-root:is([data-theme="skyOps"], [data-theme="lightHangar"], [data-theme="tacticalMap"], [data-theme="laboratory"]) :is(.hud-mini-button, .hud-icon-button) {
+  background: color-mix(in srgb, var(--color-obsidian) 82%, transparent);
+  border-width: 1px;
+  font-family: var(--ui-font);
+}
+
+.ui-root:is([data-theme="skyOps"], [data-theme="lightHangar"], [data-theme="tacticalMap"], [data-theme="laboratory"]) :is(.text-glow-hud, .text-glow-cyan, .text-glow-amber, .text-glow-threat) {
+  text-shadow: none;
+}
+
+.ui-root:is([data-theme="skyOps"], [data-theme="lightHangar"], [data-theme="tacticalMap"], [data-theme="laboratory"]) .radar-sweep::after {
+  background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--color-hud) 3%, transparent) 45%, color-mix(in srgb, var(--color-hud) 8%, transparent) 50%, color-mix(in srgb, var(--color-hud) 3%, transparent) 55%, transparent 100%);
+}
+
+.ui-root[data-theme="skyOps"] :is(.topbar, .display-toolbar) {
+  border-bottom-width: 2px;
+}
+
+.ui-root[data-theme="lightHangar"] :is(.mil-panel, .hud-mini-button, .hud-icon-button, .ui-settings-popover) {
+  border-width: 2px;
+}
+
+.ui-root[data-theme="lightHangar"] .mil-panel::before,
+.ui-root[data-theme="lightHangar"] .mil-panel::after,
+.ui-root[data-theme="lightHangar"] .mil-corners::before,
+.ui-root[data-theme="lightHangar"] .mil-corners::after,
+.ui-root[data-theme="laboratory"] .mil-panel::before,
+.ui-root[data-theme="laboratory"] .mil-panel::after,
+.ui-root[data-theme="laboratory"] .mil-corners::before,
+.ui-root[data-theme="laboratory"] .mil-corners::after {
+  display: none;
+}
+
+.ui-root[data-theme="tacticalMap"] .mil-panel {
+  border-style: dashed;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-hud) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-hud) 4%, transparent) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+
+.ui-root[data-theme="tacticalMap"] :is(.workspace-toolbar, .display-toolbar) {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.ui-root[data-theme="laboratory"] :is(.workspace-toolbar, .display-toolbar, .result-inspector) {
+  border-color: var(--color-slate-steel);
+  box-shadow: none;
+}
+
+.ui-root[data-theme="laboratory"] :is(.hud-mini-button, .hud-icon-button) {
+  letter-spacing: 0.04em;
+  font-weight: 600;
 }
 
 .hud-mini-button:hover,

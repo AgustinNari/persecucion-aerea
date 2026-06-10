@@ -11,15 +11,16 @@ const defaultVisible: Record<DisplayId, boolean> = { grid: true, trajectory: tru
 function loadWorkspacePrefs() {
   try {
     const saved = JSON.parse(localStorage.getItem("taccon-workspace-prefs") ?? "{}");
-    const visible = saved.visible ? { ...defaultVisible, ...saved.visible } : defaultVisible;
+    const visible = Object.fromEntries(defaultOrder.map((id) => [id, typeof saved.visible?.[id] === "boolean" ? saved.visible[id] : defaultVisible[id]])) as Record<DisplayId, boolean>;
+    const validOrder = Array.isArray(saved.order) &&
+      saved.order.length === defaultOrder.length &&
+      new Set(saved.order).size === defaultOrder.length &&
+      saved.order.every((id: unknown) => defaultOrder.includes(id as DisplayId));
+    const validLayouts: LayoutPreset[] = ["balanced", "threeLarge", "distanceLarge"];
     return {
-      order: Array.isArray(saved.order) &&
-        saved.order.length === 3 &&
-        saved.order.every((id: unknown) => defaultOrder.includes(id as DisplayId))
-        ? saved.order as DisplayId[]
-        : defaultOrder,
+      order: validOrder ? saved.order as DisplayId[] : defaultOrder,
       visible: Object.values(visible).some(Boolean) ? visible : defaultVisible,
-      layout: (saved.layout ?? "balanced") as LayoutPreset,
+      layout: validLayouts.includes(saved.layout) ? saved.layout as LayoutPreset : "balanced",
       showToolbar: saved.showToolbar !== false,
       showInspector: saved.showInspector === true,
     };
@@ -226,7 +227,7 @@ export default function GraphWorkspace({ result, currentFrame, onEvent, demoSign
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden tactical-grid">
       <div className="workspace-toolbar">
-        <button onClick={() => setShowToolbar((value) => !value)} className="hud-mini-button" title="Mostrar u ocultar controles del workspace">
+        <button onClick={() => setShowToolbar((value) => !value)} className="hud-mini-button" title="Mostrar u ocultar controles del área de visores">
           {showToolbar ? "OCULTAR CONTROLES" : "MOSTRAR CONTROLES"}
         </button>
         <span className="tac-label tac-label-hud">ÁREA DE VISORES</span>
@@ -237,7 +238,7 @@ export default function GraphWorkspace({ result, currentFrame, onEvent, demoSign
               key={id}
               onClick={() => toggleVisible(id)}
               className={`hud-mini-button ${visible[id] ? "hud-mini-button-active" : ""}`}
-              title={visible[id] && visibleDisplays.length === 1 ? "Debe quedar al menos un display visible" : undefined}
+              title={visible[id] && visibleDisplays.length === 1 ? "Debe quedar al menos un visor visible" : undefined}
             >
               {displayInfo[id].code.replace("VISOR ", "V")}
             </button>
@@ -275,7 +276,7 @@ export default function GraphWorkspace({ result, currentFrame, onEvent, demoSign
           <InspectorCell label="TIEMPO TOTAL" value={`${(result.time.at(-1) ?? 0).toFixed(2)}s`} />
           <InspectorCell label="DISTANCIA ACTUAL" value={`${(result.distance[currentFrame] ?? 0).toFixed(1)}m`} />
           <InspectorCell label="INTEGRADOR" value={result.metadata.integrator.toUpperCase()} />
-          <InspectorCell label="ARRAYS" value={arraysAligned ? "ALINEADOS" : "REVISAR"} warning={!arraysAligned} />
+          <InspectorCell label="ARREGLOS" value={arraysAligned ? "ALINEADOS" : "REVISAR"} warning={!arraysAligned} />
           <InspectorCell label="R MIN" value={`${result.outcome.minDistance.toFixed(1)}m`} />
           <InspectorCell label="INTERCEPCIÓN" value={result.outcome.intercepted ? `SÍ · ${result.outcome.interceptTime?.toFixed(2)}s` : "NO"} />
           <button onClick={copySummary} className="hud-mini-button">COPIAR RESUMEN</button>
@@ -320,7 +321,7 @@ export default function GraphWorkspace({ result, currentFrame, onEvent, demoSign
                   </div>
                 </div>
                 <div className="flex-1 min-h-0 p-2 graph-container">
-                  {/*Reemplazar este placeholder con el componente real del gráfico cuando los Grupos 4/5 lo tengan listo.*/}
+                  {/* Integración con los Grupos 4/5: reemplazar por el gráfico real con result={result} y currentFrame={currentFrame}. */}
                   <GraphPlaceholder
                     name={info.name}
                     description={info.description}
