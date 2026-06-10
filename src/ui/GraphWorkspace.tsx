@@ -1,13 +1,43 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SimulationResult } from "../shared/types";
 import GraphPlaceholder from "./GraphPlaceholder";
 
 type DisplayId = "grid" | "trajectory" | "distance";
 type LayoutPreset = "balanced" | "threeLarge" | "distanceLarge";
 
+const defaultOrder: DisplayId[] = ["grid", "trajectory", "distance"];
+const defaultVisible: Record<DisplayId, boolean> = { grid: true, trajectory: true, distance: true };
+
+function loadWorkspacePrefs() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("taccon-workspace-prefs") ?? "{}");
+    const visible = saved.visible ? { ...defaultVisible, ...saved.visible } : defaultVisible;
+    return {
+      order: Array.isArray(saved.order) &&
+        saved.order.length === 3 &&
+        saved.order.every((id: unknown) => defaultOrder.includes(id as DisplayId))
+        ? saved.order as DisplayId[]
+        : defaultOrder,
+      visible: Object.values(visible).some(Boolean) ? visible : defaultVisible,
+      layout: (saved.layout ?? "balanced") as LayoutPreset,
+      showToolbar: saved.showToolbar !== false,
+      showInspector: saved.showInspector === true,
+    };
+  } catch {
+    return { order: defaultOrder, visible: defaultVisible, layout: "balanced" as LayoutPreset, showToolbar: true, showInspector: false };
+  }
+}
+
 interface GraphWorkspaceProps {
   result: SimulationResult;
   currentFrame: number;
+  onEvent?: (message: string) => void;
+  demoSignal?: number;
+  focusSignal?: number;
+  escapeSignal?: number;
+  resetSignal?: number;
+  inspectorSignal?: number;
+  cleanSignal?: number;
 }
 
 const displayInfo: Record<DisplayId, {
@@ -20,7 +50,7 @@ const displayInfo: Record<DisplayId, {
   dotClass: string;
 }> = {
   grid: {
-    code: "DISPLAY 01",
+    code: "VISOR 01",
     title: "CENITAL 2D",
     name: "GridView2D",
     description: "Vista cenital | Grilla táctica",
@@ -29,7 +59,7 @@ const displayInfo: Record<DisplayId, {
     dotClass: "bg-amber-glow",
   },
   trajectory: {
-    code: "DISPLAY 02",
+    code: "VISOR 02",
     title: "TRAYECTORIA 3D",
     name: "Trajectory3D",
     description: "Espacio de misión | Three.js",
@@ -38,7 +68,7 @@ const displayInfo: Record<DisplayId, {
     dotClass: "bg-cyan-glow",
   },
   distance: {
-    code: "DISPLAY 03",
+    code: "VISOR 03",
     title: "RANGO vs TIEMPO",
     name: "DistancePlot",
     description: "Distancia R(t) | Análisis de intercepción",
@@ -48,12 +78,15 @@ const displayInfo: Record<DisplayId, {
   },
 };
 
-export default function GraphWorkspace({ result, currentFrame }: GraphWorkspaceProps) {
-  const [order, setOrder] = useState<DisplayId[]>(["grid", "trajectory", "distance"]);
-  const [visible, setVisible] = useState<Record<DisplayId, boolean>>({ grid: true, trajectory: true, distance: true });
+export default function GraphWorkspace({ result, currentFrame, onEvent, demoSignal = 0, focusSignal = 0, escapeSignal = 0, resetSignal = 0, inspectorSignal = 0, cleanSignal = 0 }: GraphWorkspaceProps) {
+  const [initialPrefs] = useState(loadWorkspacePrefs);
+  const [order, setOrder] = useState<DisplayId[]>(initialPrefs.order);
+  const [visible, setVisible] = useState<Record<DisplayId, boolean>>(initialPrefs.visible);
   const [focused, setFocused] = useState<DisplayId | null>(null);
-  const [layout, setLayout] = useState<LayoutPreset>("balanced");
-  const [showInspector, setShowInspector] = useState(false);
+  const [layout, setLayout] = useState<LayoutPreset>(initialPrefs.layout);
+  const [showInspector, setShowInspector] = useState(initialPrefs.showInspector);
+  const [showToolbar, setShowToolbar] = useState(initialPrefs.showToolbar);
+  const [dragging, setDragging] = useState<DisplayId | null>(null);
 
   const visibleDisplays = order.filter((id) => visible[id]);
   const primaryLengths = [
@@ -68,6 +101,52 @@ export default function GraphWorkspace({ result, currentFrame }: GraphWorkspaceP
   ];
   const arraysAligned = primaryLengths.every((length) => length === result.time.length);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("taccon-workspace-prefs", JSON.stringify({ order, visible, layout, showToolbar, showInspector }));
+    } catch {
+    }
+  }, [layout, order, showInspector, showToolbar, visible]);
+
+  useEffect(() => {
+    if (demoSignal === 0) return;
+    setVisible({ grid: true, trajectory: true, distance: true });
+    setFocused(null);
+    setLayout("balanced");
+  }, [demoSignal]);
+
+  useEffect(() => {
+    if (focusSignal === 0) return;
+    setFocused((current) => current ?? order.find((id) => visible[id]) ?? null);
+  }, [focusSignal]);
+
+  useEffect(() => {
+    if (escapeSignal === 0) return;
+    setFocused(null);
+  }, [escapeSignal]);
+
+  useEffect(() => {
+    if (resetSignal === 0) return;
+    setOrder(defaultOrder);
+    setVisible(defaultVisible);
+    setLayout("balanced");
+    setFocused(null);
+    setShowToolbar(true);
+    setShowInspector(false);
+  }, [resetSignal]);
+
+  useEffect(() => {
+    if (inspectorSignal === 0) return;
+    setShowInspector((value) => !value);
+  }, [inspectorSignal]);
+
+  useEffect(() => {
+    if (cleanSignal === 0) return;
+    setShowInspector(false);
+    setShowToolbar(false);
+    setFocused(null);
+  }, [cleanSignal]);
+
   const workspaceClass = useMemo(() => {
     if (focused || visibleDisplays.length === 1) return "grid-cols-1 grid-rows-1";
     if (visibleDisplays.length === 2) return "grid-cols-2 grid-rows-1";
@@ -77,9 +156,13 @@ export default function GraphWorkspace({ result, currentFrame }: GraphWorkspaceP
   }, [focused, layout, visibleDisplays.length]);
 
   const toggleVisible = (id: DisplayId) => {
-    if (visible[id] && visibleDisplays.length === 1) return;
+    if (visible[id] && visibleDisplays.length === 1) {
+      onEvent?.("No se puede ocultar el último visor");
+      return;
+    }
     setVisible((current) => ({ ...current, [id]: !current[id] }));
     if (focused === id) setFocused(null);
+    onEvent?.(`Visor ${visible[id] ? "oculto" : "visible"}: ${displayInfo[id].code}`);
   };
 
   const move = (id: DisplayId, direction: -1 | 1) => {
@@ -89,14 +172,49 @@ export default function GraphWorkspace({ result, currentFrame }: GraphWorkspaceP
       if (from === to) return current;
       const next = [...current];
       [next[from], next[to]] = [next[to], next[from]];
+      onEvent?.(`Visor movido: ${displayInfo[id].code}`);
       return next;
     });
+  };
+
+  const dropOn = (target: DisplayId) => {
+    if (!dragging || dragging === target) return;
+    setOrder((current) => {
+      const next = current.filter((id) => id !== dragging);
+      next.splice(next.indexOf(target), 0, dragging);
+      return next;
+    });
+    onEvent?.(`Visor reordenado: ${displayInfo[dragging].code}`);
+    setDragging(null);
+  };
+
+  const copySummary = async () => {
+    const summary = [
+      `Fuente: mock`,
+      `Frames: ${result.time.length}`,
+      `Frame actual: ${currentFrame}`,
+      `Tiempo: ${(result.time[currentFrame] ?? 0).toFixed(2)} / ${(result.time.at(-1) ?? 0).toFixed(2)} s`,
+      `Distancia actual: ${(result.distance[currentFrame] ?? 0).toFixed(1)} m`,
+      `Distancia mínima: ${result.outcome.minDistance.toFixed(1)} m`,
+      `Intercepción: ${result.outcome.intercepted ? "sí" : "no"}`,
+      `Integrador: ${result.metadata.integrator.toUpperCase()}`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(summary);
+      onEvent?.("Resumen del inspector copiado");
+    } catch {
+      onEvent?.("No se pudo copiar el resumen");
+    }
   };
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden tactical-grid">
       <div className="workspace-toolbar">
-        <span className="tac-label tac-label-hud">GRAPH WORKSPACE</span>
+        <button onClick={() => setShowToolbar((value) => !value)} className="hud-mini-button" title="Mostrar u ocultar controles del workspace">
+          {showToolbar ? "OCULTAR CONTROLES" : "MOSTRAR CONTROLES"}
+        </button>
+        <span className="tac-label tac-label-hud">ÁREA DE VISORES</span>
+        {showToolbar && <>
         <div className="flex items-center gap-1">
           {order.map((id) => (
             <button
@@ -105,7 +223,7 @@ export default function GraphWorkspace({ result, currentFrame }: GraphWorkspaceP
               className={`hud-mini-button ${visible[id] ? "hud-mini-button-active" : ""}`}
               title={visible[id] && visibleDisplays.length === 1 ? "Debe quedar al menos un display visible" : undefined}
             >
-              {displayInfo[id].code.replace("DISPLAY ", "D")}
+              {displayInfo[id].code.replace("VISOR ", "V")}
             </button>
           ))}
         </div>
@@ -116,15 +234,20 @@ export default function GraphWorkspace({ result, currentFrame }: GraphWorkspaceP
             onClick={() => {
               setFocused(null);
               setLayout(preset);
+              onEvent?.(`Distribución: ${preset === "balanced" ? "Balanceada" : preset === "threeLarge" ? "3D dominante" : "Análisis de distancia"}`);
             }}
             className={`hud-mini-button ${layout === preset && !focused ? "hud-mini-button-active" : ""}`}
           >
-            {preset === "balanced" ? "BALANCE" : preset === "threeLarge" ? "3D LARGE" : "RANGE LARGE"}
+            {preset === "balanced" ? "BALANCEADO" : preset === "threeLarge" ? "3D DOMINANTE" : "DISTANCIA"}
           </button>
         ))}
-        <button onClick={() => setShowInspector((value) => !value)} className={`hud-mini-button ml-auto ${showInspector ? "hud-mini-button-active" : ""}`}>
-          RESULT INSPECTOR
+        <button onClick={() => {
+          setShowInspector((value) => !value);
+          onEvent?.(`Inspector ${showInspector ? "cerrado" : "abierto"}`);
+        }} className={`hud-mini-button ml-auto ${showInspector ? "hud-mini-button-active" : ""}`}>
+          INSPECTOR
         </button>
+        </>}
       </div>
 
       {showInspector && (
@@ -132,11 +255,14 @@ export default function GraphWorkspace({ result, currentFrame }: GraphWorkspaceP
           <InspectorCell label="FUENTE" value="MOCK" />
           <InspectorCell label="FRAMES" value={String(result.time.length)} />
           <InspectorCell label="FRAME ACTUAL" value={String(currentFrame)} />
+          <InspectorCell label="TIEMPO ACTUAL" value={`${(result.time[currentFrame] ?? 0).toFixed(2)}s`} />
           <InspectorCell label="TIEMPO TOTAL" value={`${(result.time.at(-1) ?? 0).toFixed(2)}s`} />
+          <InspectorCell label="DISTANCIA ACTUAL" value={`${(result.distance[currentFrame] ?? 0).toFixed(1)}m`} />
           <InspectorCell label="INTEGRADOR" value={result.metadata.integrator.toUpperCase()} />
           <InspectorCell label="ARRAYS" value={arraysAligned ? "ALINEADOS" : "REVISAR"} warning={!arraysAligned} />
           <InspectorCell label="R MIN" value={`${result.outcome.minDistance.toFixed(1)}m`} />
-          <InspectorCell label="INTERCEPCIÓN" value={result.outcome.intercepted ? "SÍ" : "NO"} />
+          <InspectorCell label="INTERCEPCIÓN" value={result.outcome.intercepted ? `SÍ · ${result.outcome.interceptTime?.toFixed(2)}s` : "NO"} />
+          <button onClick={copySummary} className="hud-mini-button">COPIAR RESUMEN</button>
         </div>
       )}
 
@@ -147,19 +273,30 @@ export default function GraphWorkspace({ result, currentFrame }: GraphWorkspaceP
           const spanClass = getSpanClass(id, visibleDisplays.length, layout, focused);
 
           return (
-            <section key={id} className={`mil-panel ${info.panelClass} p-0 flex flex-col min-h-0 relative ${spanClass}`}>
+            <section
+              key={id}
+              draggable
+              onDragStart={() => setDragging(id)}
+              onDragEnd={() => setDragging(null)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={() => dropOn(id)}
+              className={`mil-panel ${info.panelClass} p-0 flex flex-col min-h-0 relative ${spanClass} ${dragging === id ? "display-dragging" : ""}`}
+            >
               <div className="mil-corners flex flex-col min-h-0 h-full">
                 <div className="display-toolbar">
                   <div className={`w-1.5 h-1.5 pulse-dot ${info.dotClass}`} />
                   <span className="tac-label">{info.code}</span>
                   <span className="text-[8px] text-mist tracking-widest">{info.title}</span>
                   <div className="ml-auto flex gap-1">
-                    <button onClick={() => move(id, -1)} className="hud-icon-button" title="Mover antes">◂</button>
-                    <button onClick={() => move(id, 1)} className="hud-icon-button" title="Mover después">▸</button>
-                    <button onClick={() => setFocused(focused === id ? null : id)} className="hud-icon-button" title={focused === id ? "Restaurar" : "Enfocar"}>
-                      {focused === id ? "RESTORE" : "FOCUS"}
+                    <button onClick={() => move(id, -1)} className="hud-icon-button" title="Mover antes" aria-label={`Mover ${info.code} antes`}>◂</button>
+                    <button onClick={() => move(id, 1)} className="hud-icon-button" title="Mover después" aria-label={`Mover ${info.code} después`}>▸</button>
+                    <button onClick={() => {
+                      setFocused(focused === id ? null : id);
+                      onEvent?.(`${focused === id ? "Foco restaurado" : "Visor enfocado"}: ${info.code}`);
+                    }} className="hud-icon-button" title={focused === id ? "Restaurar" : "Enfocar"}>
+                      {focused === id ? "RESTAURAR" : "ENFOCAR"}
                     </button>
-                    <button onClick={() => toggleVisible(id)} className="hud-icon-button" title="Ocultar">HIDE</button>
+                    <button onClick={() => toggleVisible(id)} className="hud-icon-button" title="Ocultar">OCULTAR</button>
                   </div>
                 </div>
                 <div className="flex-1 min-h-0 p-2 graph-container">

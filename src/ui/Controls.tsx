@@ -18,6 +18,7 @@ interface ControlsProps {
   onSimulate: (config: SimulationConfig) => void;
   configStatus?: "APLICADA" | "PENDIENTE" | "INVÁLIDA";
   runCount?: number;
+  onEvent?: (message: string) => void;
 }
 
 // Military Section
@@ -72,7 +73,7 @@ function Section({ title, code, accentColor, defaultOpen = true, onReset, childr
             className="border border-slate-steel px-1.5 py-0.5 text-[7px] text-ash hover:text-hud hover:border-hud/30 transition-colors"
             title={`Restaurar ${title}`}
           >
-            RESET
+            RESTAURAR
           </span>
         )}
         <motion.span
@@ -259,7 +260,7 @@ export function validateConfig(config: SimulationConfig): string[] {
 }
 
 //Main Component
-export default function Controls({ config, onConfigChange, onSimulate, configStatus = "APLICADA", runCount = 1 }: ControlsProps) {
+export default function Controls({ config, onConfigChange, onSimulate, configStatus = "APLICADA", runCount = 1, onEvent }: ControlsProps) {
   const validationErrors = validateConfig(config);
 
   const updateAircraft = useCallback(
@@ -310,7 +311,8 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
     }
 
     onConfigChange(next);
-  }, [onConfigChange]);
+    onEvent?.(`Preset cargado: ${preset}`);
+  }, [onConfigChange, onEvent]);
 
   const handleSimulate = useCallback(() => {
     const errors = validateConfig(config);
@@ -323,7 +325,7 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
       <div className="px-3 py-2 border-b border-panel-border flex items-center gap-2">
         <div className="w-1.5 h-1.5 bg-hud pulse-dot" />
         <span className="text-[9px] font-bold tracking-[0.2em] text-hud text-glow-hud">
-          MISSION CONFIG
+          CONFIGURACIÓN DE MISIÓN
         </span>
         <span className="text-[7px] text-ash ml-auto tracking-[0.15em]">[SYS-PARAM]</span>
       </div>
@@ -335,10 +337,10 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
           title="TARGET · AVIÓN"
           code="TGT"
           accentColor="amber"
-          onReset={() => onConfigChange({
-            ...config,
-            aircraft: structuredClone(mockConfig.aircraft),
-          })}
+          onReset={() => {
+            onConfigChange({ ...config, aircraft: structuredClone(mockConfig.aircraft) });
+            onEvent?.("Aircraft config reset");
+          }}
         >
           <Vec3Field
             label="POS INICIAL"
@@ -416,10 +418,10 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
           title="WEAPON · MISIL"
           code="WPN"
           accentColor="cyan"
-          onReset={() => onConfigChange({
-            ...config,
-            missile: structuredClone(mockConfig.missile),
-          })}
+          onReset={() => {
+            onConfigChange({ ...config, missile: structuredClone(mockConfig.missile) });
+            onEvent?.("Missile config reset");
+          }}
         >
           <Vec3Field
             label="POS INICIAL"
@@ -476,10 +478,10 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
           code="SIM"
           accentColor="neutral"
           defaultOpen={false}
-          onReset={() => onConfigChange({
-            ...config,
-            simulation: structuredClone(mockConfig.simulation),
-          })}
+          onReset={() => {
+            onConfigChange({ ...config, simulation: structuredClone(mockConfig.simulation) });
+            onEvent?.("Simulation params reset");
+          }}
         >
           <NumberField
             label="PASO DE TIEMPO (dt)"
@@ -520,7 +522,7 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
           <span className={configStatus === "INVÁLIDA" ? "status-chip status-chip-danger" : configStatus === "PENDIENTE" ? "status-chip status-chip-warning" : "status-chip status-chip-ready"}>
             CONFIG {configStatus}
           </span>
-          <span className="text-ash">ÚLTIMO RESULTADO: RUN #{runCount}</span>
+          <span className="text-ash">ÚLTIMO RESULTADO: CORRIDA #{runCount}</span>
         </div>
         <div className="grid grid-cols-2 gap-1">
           <button onClick={() => applyPreset("pn")} className="btn btn-ghost !px-1 !py-1.5 !text-[8px]">
@@ -532,8 +534,11 @@ export default function Controls({ config, onConfigChange, onSimulate, configSta
           <button onClick={() => applyPreset("weave")} className="btn btn-ghost !px-1 !py-1.5 !text-[8px]">
             EVASIÓN SERPENTEO
           </button>
-          <button onClick={() => onConfigChange(cloneConfig(mockConfig))} className="btn btn-ghost !px-1 !py-1.5 !text-[8px]">
-            RESET GLOBAL
+          <button onClick={() => {
+            onConfigChange(cloneConfig(mockConfig));
+            onEvent?.("Global config reset");
+          }} className="btn btn-ghost !px-1 !py-1.5 !text-[8px]">
+            RESTAURAR TODO
           </button>
         </div>
 

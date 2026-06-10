@@ -21,6 +21,8 @@ interface PlaybackBarProps {
   disabled?: boolean;
   disabledReason?: string;
   onDisabledAttempt?: () => void;
+  eventTime?: number | null;
+  eventLabel?: string;
 }
 
 export default function PlaybackBar({
@@ -39,6 +41,8 @@ export default function PlaybackBar({
   disabled = false,
   disabledReason,
   onDisabledAttempt,
+  eventTime,
+  eventLabel,
 }: PlaybackBarProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const lastFrame = Math.max(0, totalFrames - 1);
@@ -46,6 +50,8 @@ export default function PlaybackBar({
     ? Math.min(Math.max(0, Math.floor(currentFrame)), lastFrame)
     : 0;
   const progress = totalFrames > 1 ? safeFrame / lastFrame : 0;
+  const eventProgress = totalTime > 0 && eventTime != null ? Math.min(Math.max(eventTime / totalTime, 0), 1) : null;
+  const playbackState = disabled ? "BLOQUEADO" : playing ? "REPRODUCIENDO" : safeFrame >= lastFrame ? "FIN DE CORRIDA" : "PAUSADO";
 
   //Seek logic
   const seekFromEvent = useCallback(
@@ -95,7 +101,7 @@ export default function PlaybackBar({
       title={disabled ? disabledReason : undefined}
     >
       {/*Mission label */}
-      <span className="text-[8px] text-mist tracking-[0.2em] min-w-[60px]">TIMELINE</span>
+      <span className={`playback-state ${playing ? "playback-live" : ""}`}>{playbackState}</span>
 
       {/*Playback controls*/}
       <div className="flex items-center gap-1">
@@ -105,12 +111,14 @@ export default function PlaybackBar({
           className="w-6 h-6 flex items-center justify-center border border-slate-steel text-mist hover:text-hud hover:border-hud/30 transition-colors cursor-pointer"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          title="RESET"
+          title="REINICIAR"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <path d="M1.5 1.5V8.5M3 5L8.5 1.5V8.5L3 5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
           </svg>
         </motion.button>
+        <button onClick={() => onSeek(safeFrame - 5)} className="hud-icon-button" title="Retroceder 5 frames" disabled={disabled}>-5</button>
+        <button onClick={() => onSeek(safeFrame - 1)} className="hud-icon-button" title="Retroceder 1 frame" disabled={disabled}>-1</button>
 
         {/* Play/Pause */}
         <motion.button
@@ -135,6 +143,8 @@ export default function PlaybackBar({
             </svg>
           )}
         </motion.button>
+        <button onClick={() => onSeek(safeFrame + 1)} className="hud-icon-button" title="Avanzar 1 frame" disabled={disabled}>+1</button>
+        <button onClick={() => onSeek(safeFrame + 5)} className="hud-icon-button" title="Avanzar 5 frames" disabled={disabled}>+5</button>
       </div>
 
       {/*Time readout*/}
@@ -181,16 +191,24 @@ export default function PlaybackBar({
           <div className="w-2.5 h-2.5 border border-hud bg-hud/20 rotate-45 group-hover:bg-hud/40 transition-colors" />
           <div className="w-px h-1.5 bg-hud" />
         </div>
+
+        {eventProgress != null && (
+          <div
+            className="timeline-event-marker"
+            style={{ left: `${eventProgress * 100}%` }}
+            title={`${eventLabel ?? "EVENTO DE MISIÓN"} · T+${eventTime?.toFixed(2)}s`}
+          />
+        )}
       </div>
 
       {/*Frame counter */}
       <div className="text-[9px] text-ash tabular-nums tracking-wider min-w-[70px] text-right">
-        FRAME {String(safeFrame).padStart(3, "0")}/{String(lastFrame).padStart(3, "0")}
+        FRAME {String(safeFrame).padStart(3, "0")} / {String(lastFrame).padStart(3, "0")} · {Math.round(progress * 100)}%
       </div>
 
       {disabled && (
         <div className="border border-warning/30 bg-warning/5 px-2 py-0.5 text-[8px] text-warning tracking-[0.15em]">
-          LOCKED
+          BLOQUEADO
         </div>
       )}
 

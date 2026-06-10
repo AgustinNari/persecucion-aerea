@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type UiTheme = "green" | "cyan" | "amber" | "threat" | "blueprint" | "terminal";
 export type UiDensity = "compact" | "normal" | "presentation";
+export type PanelStyle = "tactical" | "glass" | "blueprint" | "crt" | "minimal" | "alert";
+export type GridIntensity = "low" | "medium" | "high";
 
 export interface UiSettings {
   theme: UiTheme;
@@ -9,6 +11,9 @@ export interface UiSettings {
   glow: boolean;
   reducedMotion: boolean;
   density: UiDensity;
+  sound: boolean;
+  panelStyle: PanelStyle;
+  gridIntensity: GridIntensity;
 }
 
 interface UiSettingsPanelProps {
@@ -16,6 +21,8 @@ interface UiSettingsPanelProps {
   onChange: (settings: UiSettings) => void;
   presentationMode: boolean;
   onPresentationModeChange: (enabled: boolean) => void;
+  onReset: () => void;
+  closeSignal?: number;
 }
 
 const themes: { value: UiTheme; label: string }[] = [
@@ -32,9 +39,15 @@ export default function UiSettingsPanel({
   onChange,
   presentationMode,
   onPresentationModeChange,
+  onReset,
+  closeSignal = 0,
 }: UiSettingsPanelProps) {
   const [open, setOpen] = useState(false);
   const patch = (next: Partial<UiSettings>) => onChange({ ...settings, ...next });
+
+  useEffect(() => {
+    if (closeSignal > 0) setOpen(false);
+  }, [closeSignal]);
 
   return (
     <div className="relative topbar-control">
@@ -43,14 +56,14 @@ export default function UiSettingsPanel({
         className="hud-mini-button"
         aria-expanded={open}
       >
-        UI / VISUAL
+        VISUAL
       </button>
 
       {open && (
         <div className="ui-settings-popover">
-          <div className="tac-label tac-label-hud mb-1">UI / VISUAL</div>
+          <div className="tac-label tac-label-hud mb-1">PREFERENCIAS VISUALES</div>
           <p className="text-[8px] text-ash tracking-wide mb-3">Apariencia local de la estación táctica.</p>
-          <label>PRESET VISUAL</label>
+          <label>ESTILO VISUAL</label>
           <select value={settings.theme} onChange={(event) => patch({ theme: event.target.value as UiTheme })}>
             {themes.map((theme) => <option key={theme.value} value={theme.value}>{theme.label}</option>)}
           </select>
@@ -69,14 +82,35 @@ export default function UiSettingsPanel({
             ))}
           </div>
 
+          <label className="mt-3">ESTILO DE PANEL</label>
+          <select value={settings.panelStyle} onChange={(event) => patch({ panelStyle: event.target.value as PanelStyle })}>
+            <option value="tactical">TÁCTICO</option>
+            <option value="glass">CRISTAL</option>
+            <option value="blueprint">BLUEPRINT</option>
+            <option value="crt">CRT</option>
+            <option value="minimal">MINIMAL</option>
+            <option value="alert">ALERTA</option>
+          </select>
+
+          <label className="mt-3">INTENSIDAD DE GRILLA</label>
+          <div className="grid grid-cols-3 gap-1">
+            {(["low", "medium", "high"] as GridIntensity[]).map((intensity) => (
+              <button key={intensity} onClick={() => patch({ gridIntensity: intensity })} className={`hud-mini-button ${settings.gridIntensity === intensity ? "hud-mini-button-active" : ""}`}>
+                {intensity === "low" ? "BAJA" : intensity === "medium" ? "MEDIA" : "ALTA"}
+              </button>
+            ))}
+          </div>
+
           <div className="mil-divider my-3" />
           <label>EFECTOS Y PRESENTACIÓN</label>
           <div className="space-y-1">
             <Toggle label="SCANLINES" enabled={settings.scanlines} onChange={(scanlines) => patch({ scanlines })} />
             <Toggle label="EFECTOS / GLOW" enabled={settings.glow} onChange={(glow) => patch({ glow })} />
             <Toggle label="ANIMACIÓN REDUCIDA" enabled={settings.reducedMotion} onChange={(reducedMotion) => patch({ reducedMotion })} />
+            <Toggle label="SONIDO UI" enabled={settings.sound} onChange={(sound) => patch({ sound })} />
             <Toggle label="MODO PRESENTACIÓN" enabled={presentationMode} onChange={onPresentationModeChange} />
           </div>
+          <button onClick={onReset} className="hud-mini-button w-full mt-3">RESTABLECER UI</button>
         </div>
       )}
     </div>

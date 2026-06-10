@@ -104,7 +104,7 @@ export default function StatusPanel({
           className="flex items-center gap-1 border border-hud/30 px-2 py-0.5"
         >
           <div className="w-1.5 h-1.5 bg-hud pulse-dot" />
-          <span className="text-[9px] text-hud font-bold tracking-[0.2em] text-glow-hud">REC</span>
+          <span className="text-[9px] text-hud font-bold tracking-[0.2em] text-glow-hud">EN VIVO</span>
         </motion.div>
       )}
     </div>

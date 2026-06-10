@@ -10,8 +10,29 @@ import PlaybackBar from "./PlaybackBar";
 import StatusPanel from "./StatusPanel";
 import GraphWorkspace from "./GraphWorkspace";
 import UiSettingsPanel, { type UiSettings } from "./UiSettingsPanel";
+import MissionLog, { type MissionEvent } from "./MissionLog";
 
 type TabId = "simulation" | "theory";
+type EventTone = NonNullable<MissionEvent["tone"]>;
+
+const DEFAULT_UI_SETTINGS: UiSettings = {
+  theme: "green",
+  scanlines: true,
+  glow: true,
+  reducedMotion: false,
+  density: "normal",
+  sound: false,
+  panelStyle: "tactical",
+  gridIntensity: "medium",
+};
+
+function loadUiSettings(): UiSettings {
+  try {
+    return { ...DEFAULT_UI_SETTINGS, ...JSON.parse(localStorage.getItem("taccon-ui-settings") ?? "{}") };
+  } catch {
+    return DEFAULT_UI_SETTINGS;
+  }
+}
 
 const tabContentVariants = {
   initial: { opacity: 0, y: 8 },
@@ -52,19 +73,30 @@ export default function App() {
   const [currentFrame, setCurrentFrame] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [presentationMode, setPresentationMode] = useState(false);
-  const [uiSettings, setUiSettings] = useState<UiSettings>({
-    theme: "green",
-    scanlines: true,
-    glow: true,
-    reducedMotion: false,
-    density: "normal",
-  });
+  const [uiSettings, setUiSettings] = useState<UiSettings>(loadUiSettings);
   const [uiMessage, setUiMessage] = useState("Simulación cargada con datos mock · lista para reproducir");
   const [runCount, setRunCount] = useState(1);
   const [lastRunTime, setLastRunTime] = useState(() => new Date());
   const [runNotice, setRunNotice] = useState<string | null>(null);
+  const [actionToast, setActionToast] = useState<string | null>(null);
+  const [missionEvents, setMissionEvents] = useState<MissionEvent[]>([]);
+  const [demoSignal, setDemoSignal] = useState(0);
+  const [focusSignal, setFocusSignal] = useState(0);
+  const [escapeSignal, setEscapeSignal] = useState(0);
+  const [resetWorkspaceSignal, setResetWorkspaceSignal] = useState(0);
+  const [inspectorSignal, setInspectorSignal] = useState(0);
+  const [cleanSignal, setCleanSignal] = useState(0);
+  const [logSignal, setLogSignal] = useState(0);
+  const [closePanelsSignal, setClosePanelsSignal] = useState(0);
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
+  const [showStatusPanel, setShowStatusPanel] = useState(true);
+  const [showTimeline, setShowTimeline] = useState(true);
+  const [showStateStrip, setShowStateStrip] = useState(true);
   const lastTimestampRef = useRef<number | null>(null);
   const elapsedRef = useRef(0);
+  const eventIdRef = useRef(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const endNotifiedRef = useRef(false);
 
   const totalFrames = result.time.length;
   const lastFrame = Math.max(0, totalFrames - 1);
@@ -82,15 +114,80 @@ export default function App() {
     ? "Corregí la configuración antes de reproducir"
     : "Ejecutá la simulación para aplicar cambios";
 
+  const playTone = useCallback((frequency: number, duration = 0.06) => {
+    if (!uiSettings.sound) return;
+    try {
+      const AudioContextConstructor = window.AudioContext;
+      const context = audioContextRef.current ?? new AudioContextConstructor();
+      audioContextRef.current = context;
+      if (context.state === "suspended") void context.resume();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.025, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + duration);
+    } catch {
+    }
+  }, [uiSettings.sound]);
+
+  const addEvent = useCallback((message: string, tone: EventTone = "info", toast = true) => {
+    const event: MissionEvent = {
+      id: ++eventIdRef.current,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      message,
+      tone,
+    };
+    setMissionEvents((events) => [...events, event].slice(-10));
+    if (toast) setActionToast(message);
+  }, []);
+
+  const handleUiEvent = useCallback((message: string) => {
+    addEvent(message);
+    playTone(message.includes("oculto") || message.includes("cerrad") ? 300 : 520, 0.045);
+  }, [addEvent, playTone]);
+
   useEffect(() => {
     setCurrentFrame((frame) => clampFrame(frame, lastFrame));
   }, [lastFrame, result]);
+
+  useEffect(() => {
+    if (safeFrame < lastFrame) {
+      endNotifiedRef.current = false;
+      return;
+    }
+    if (totalFrames > 1 && !endNotifiedRef.current) {
+      endNotifiedRef.current = true;
+      addEvent("Fin de corrida alcanzado", "success");
+      playTone(320, 0.1);
+    }
+  }, [addEvent, lastFrame, playTone, safeFrame, totalFrames]);
 
   useEffect(() => {
     if (!runNotice) return;
     const timeoutId = window.setTimeout(() => setRunNotice(null), 4000);
     return () => window.clearTimeout(timeoutId);
   }, [runNotice]);
+
+  useEffect(() => {
+    if (!actionToast) return;
+    const timeoutId = window.setTimeout(() => setActionToast(null), 2400);
+    return () => window.clearTimeout(timeoutId);
+  }, [actionToast]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("taccon-ui-settings", JSON.stringify(uiSettings));
+    } catch {
+    }
+  }, [uiSettings]);
+
+  useEffect(() => () => {
+    void audioContextRef.current?.close();
+  }, []);
 
   useEffect(() => {
     if (!playing || totalFrames <= 1) {
@@ -116,7 +213,9 @@ export default function App() {
         elapsedRef.current -= framesToAdvance * frameDuration;
         setCurrentFrame((frame) => {
           const nextFrame = Math.min(frame + framesToAdvance, lastFrame);
-          if (nextFrame >= lastFrame) setPlaying(false);
+          if (nextFrame >= lastFrame) {
+            setPlaying(false);
+          }
           return nextFrame;
         });
       }
@@ -137,32 +236,134 @@ export default function App() {
     setLastRunTime(new Date());
     setRunNotice("Simulación cargada con mock · frame reiniciado · listo para reproducir");
     setUiMessage("Resultado mock aplicado y listo para reproducir");
-  }, []);
+    addEvent(`CORRIDA #${runCount + 1} cargada · fuente mock · frame 0`, "success");
+    playTone(720);
+  }, [addEvent, playTone, runCount]);
 
   const handleConfigChange = useCallback((nextConfig: SimulationConfig) => {
+    const errors = validateConfig(nextConfig);
+    const invalid = errors.length > 0;
     setConfig(nextConfig);
     setPlaying(false);
     setUiMessage(
-      validateConfig(nextConfig).length > 0
+      invalid
         ? "Corregí la configuración antes de reproducir"
         : "Ejecutá la simulación para aplicar cambios",
     );
-  }, []);
+    addEvent(invalid ? `Config inválida: ${errors[0]}` : "Configuración modificada · requiere ejecutar", invalid ? "warning" : "info", false);
+    if (invalid) playTone(180, 0.09);
+  }, [addEvent, playTone]);
 
   const handlePlay = useCallback(() => {
     if (playbackDisabled) {
       setUiMessage(playbackDisabledReason);
+      addEvent(playbackDisabledReason, "warning");
+      playTone(180, 0.09);
       return;
     }
     setCurrentFrame((frame) => frame >= lastFrame ? 0 : frame);
     setPlaying(totalFrames > 1);
     setUiMessage("Reproduciendo última simulación aplicada");
-  }, [lastFrame, playbackDisabled, playbackDisabledReason, totalFrames]);
+    addEvent("Reproducción iniciada", "success");
+    playTone(620);
+  }, [addEvent, lastFrame, playTone, playbackDisabled, playbackDisabledReason, totalFrames]);
+
+  const handlePause = useCallback(() => {
+    setPlaying(false);
+    addEvent("Reproducción pausada");
+    playTone(280);
+  }, [addEvent, playTone]);
+
+  const handleRestart = useCallback(() => {
+    setCurrentFrame(0);
+    setPlaying(false);
+    addEvent("Timeline reiniciada · frame 0");
+    playTone(420);
+  }, [addEvent, playTone]);
 
   const handleSeek = useCallback((frame: number) => {
     setCurrentFrame(clampFrame(frame, lastFrame));
     setPlaying(false);
-  }, [lastFrame]);
+    addEvent(`Frame seek: ${clampFrame(frame, lastFrame)}/${lastFrame}`, "info", false);
+  }, [addEvent, lastFrame]);
+
+  const handleSpeedChange = useCallback((nextSpeed: number) => {
+    setSpeed(nextSpeed);
+    addEvent(`Velocidad de reproducción: ${nextSpeed}×`, "info", false);
+    playTone(440 + nextSpeed * 40, 0.04);
+  }, [addEvent, playTone]);
+
+  const handlePresentationMode = useCallback((enabled: boolean) => {
+    setPresentationMode(enabled);
+    addEvent(`${enabled ? "Modo presentación activado" : "Modo presentación desactivado"}`);
+  }, [addEvent]);
+
+  const handleUiSettingsChange = useCallback((next: UiSettings) => {
+    if (next.theme !== uiSettings.theme) addEvent(`Tema cambiado: ${next.theme}`);
+    if (next.sound !== uiSettings.sound) addEvent(`Sonido UI ${next.sound ? "activado" : "silenciado"}`);
+    setUiSettings(next);
+  }, [addEvent, uiSettings]);
+
+  const handleDemoMode = useCallback(() => {
+    setPresentationMode(true);
+    setCurrentFrame(0);
+    setPlaying(false);
+    setDemoSignal((signal) => signal + 1);
+    setUiMessage("Demo lista · presioná Play para iniciar");
+    addEvent("Modo demo listo · todos los visores · frame 0", "success");
+  }, [addEvent]);
+
+  const handleCleanView = useCallback(() => {
+    setPresentationMode(true);
+    setShowStatusPanel(true);
+    setShowTimeline(true);
+    setShowStateStrip(false);
+    setClosePanelsSignal((signal) => signal + 1);
+    setCleanSignal((signal) => signal + 1);
+    addEvent("Vista limpia activada", "success");
+  }, [addEvent]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.matches("input, select, textarea, [contenteditable='true']")) return;
+      if (event.code === "Space") {
+        event.preventDefault();
+        if (playing) handlePause();
+        else handlePlay();
+      } else if (event.key.toLowerCase() === "r") {
+        handleRestart();
+      } else if (event.key === "ArrowLeft") {
+        handleSeek(safeFrame - 5);
+      } else if (event.key === "ArrowRight") {
+        handleSeek(safeFrame + 5);
+      } else if (event.key.toLowerCase() === "a") {
+        handleSeek(safeFrame - 5);
+      } else if (event.key.toLowerCase() === "d") {
+        handleSeek(safeFrame + 5);
+      } else if (event.key.toLowerCase() === "p") {
+        handlePresentationMode(!presentationMode);
+      } else if (event.key.toLowerCase() === "f") {
+        setFocusSignal((signal) => signal + 1);
+      } else if (event.key.toLowerCase() === "l") {
+        setLogSignal((signal) => signal + 1);
+      } else if (event.key.toLowerCase() === "i") {
+        setInspectorSignal((signal) => signal + 1);
+      } else if (event.key.toLowerCase() === "m") {
+        handleUiSettingsChange({ ...uiSettings, sound: !uiSettings.sound });
+      } else if (event.key.toLowerCase() === "h") {
+        setShowShortcutHelp((value) => !value);
+      } else if (event.key === "Escape") {
+        setPresentationMode(false);
+        setEscapeSignal((signal) => signal + 1);
+        setClosePanelsSignal((signal) => signal + 1);
+        setShowShortcutHelp(false);
+        setActionToast(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handlePause, handlePlay, handlePresentationMode, handleRestart, handleSeek, handleUiSettingsChange, playing, presentationMode, safeFrame, uiSettings]);
 
   return (
     <MotionConfig reducedMotion={uiSettings.reducedMotion ? "always" : "never"}>
@@ -174,7 +375,34 @@ export default function App() {
         data-motion={uiSettings.reducedMotion ? "reduced" : "full"}
         data-density={uiSettings.density}
         data-presentation={presentationMode ? "on" : "off"}
+        data-panel-style={uiSettings.panelStyle}
+        data-grid-intensity={uiSettings.gridIntensity}
       >
+      <AnimatePresence>
+        {actionToast && (
+          <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} className="hud-toast">
+            &gt; {actionToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showShortcutHelp && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="shortcut-help">
+            <div className="shortcut-help-panel">
+              <div className="flex items-center justify-between mb-3">
+                <span className="tac-label tac-label-hud">ATAJOS DE TECLADO</span>
+                <button onClick={() => setShowShortcutHelp(false)} className="hud-icon-button">CERRAR</button>
+              </div>
+              {[
+                ["ESPACIO", "Reproducir / pausar"], ["R", "Reiniciar"], ["A / ←", "Retroceder 5 frames"],
+                ["D / →", "Avanzar 5 frames"], ["F", "Enfocar visor"], ["P", "Modo presentación"],
+                ["L", "Abrir/cerrar bitácora"], ["I", "Abrir/cerrar inspector"], ["M", "Activar/silenciar sonido"],
+                ["H", "Mostrar esta ayuda"], ["ESC", "Cerrar paneles y salir de foco"],
+              ].map(([key, label]) => <div key={key} className="shortcut-row"><kbd>{key}</kbd><span>{label}</span></div>)}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <motion.header
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -238,24 +466,41 @@ export default function App() {
 
         <div className="topbar-actions">
           <button
-            onClick={() => setPresentationMode((value) => !value)}
+            onClick={() => handlePresentationMode(!presentationMode)}
             className={`hud-mini-button topbar-control ${presentationMode ? "hud-mini-button-active" : ""}`}
           >
             {presentationMode ? "SALIR PRESENTACIÓN" : "PRESENTACIÓN"}
           </button>
+          <button onClick={handleDemoMode} className="hud-mini-button topbar-control" title="Preparar pantalla para demo">
+            MODO DEMO
+          </button>
+          <button onClick={handleCleanView} className="hud-mini-button topbar-control" title="Dejar workspace, KPIs y timeline">
+            VISTA LIMPIA
+          </button>
           <UiSettingsPanel
             settings={uiSettings}
-            onChange={setUiSettings}
+            onChange={handleUiSettingsChange}
             presentationMode={presentationMode}
-            onPresentationModeChange={setPresentationMode}
+            onPresentationModeChange={handlePresentationMode}
+            onReset={() => {
+              setUiSettings(DEFAULT_UI_SETTINGS);
+              setResetWorkspaceSignal((signal) => signal + 1);
+              try {
+                localStorage.removeItem("taccon-ui-settings");
+                localStorage.removeItem("taccon-workspace-prefs");
+              } catch {}
+              addEvent("Preferencias UI restablecidas", "success");
+            }}
+            closeSignal={closePanelsSignal}
           />
-          <StatusPanel
+          {showStatusPanel && <StatusPanel
             currentTime={currentTime}
             currentDistance={currentDistance}
             closingVelocity={closingVel}
             outcome={result.outcome}
             playing={playing}
-          />
+          />}
+          <button onClick={() => setShowStatusPanel((value) => !value)} className="hud-icon-button" title="Mostrar u ocultar KPIs">KPI</button>
         </div>
       </motion.header>
 
@@ -287,6 +532,7 @@ export default function App() {
                         onSimulate={handleSimulate}
                         configStatus={configStatus}
                         runCount={runCount}
+                        onEvent={handleUiEvent}
                       />
                     </motion.aside>
                   )}
@@ -297,6 +543,7 @@ export default function App() {
                   className="self-start mt-3 px-0.5 py-4 bg-obsidian border border-panel-border border-l-0 text-mist hover:text-hud transition-colors cursor-pointer z-10"
                   whileHover={{ x: 2 }}
                   title={showControls ? "OCULTAR PANEL" : "MOSTRAR PANEL"}
+                  aria-label={showControls ? "Ocultar panel de configuración" : "Mostrar panel de configuración"}
                 >
                   <motion.span
                     animate={{ rotate: showControls ? 0 : 180 }}
@@ -307,7 +554,17 @@ export default function App() {
                   </motion.span>
                 </motion.button>}
 
-                <GraphWorkspace result={result} currentFrame={safeFrame} />
+                <GraphWorkspace
+                  result={result}
+                  currentFrame={safeFrame}
+                  onEvent={handleUiEvent}
+                  demoSignal={demoSignal}
+                  focusSignal={focusSignal}
+                  escapeSignal={escapeSignal}
+                  resetSignal={resetWorkspaceSignal}
+                  inspectorSignal={inspectorSignal}
+                  cleanSignal={cleanSignal}
+                />
               </div>
 
               <AnimatePresence>
@@ -318,14 +575,14 @@ export default function App() {
                     exit={{ opacity: 0, y: 4 }}
                     className="run-notice"
                   >
-                    <span className="status-chip status-chip-ready">SIM READY</span>
+                    <span className="status-chip status-chip-ready">SIM LISTA</span>
                     <span className="text-bright">{runNotice}</span>
-                    <span className="text-hud ml-auto">RUN #{runCount} · {lastRunTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+                    <span className="text-hud ml-auto">CORRIDA #{runCount} · {lastRunTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              <div className="simulation-state-strip">
+              {showStateStrip && <div className="simulation-state-strip">
                 <div className="state-readout">
                   <span>CONFIG EDITADA</span>
                   <strong className={configInvalid ? "text-danger" : configPending ? "text-warning" : "text-mist"}>
@@ -338,15 +595,15 @@ export default function App() {
                 </div>
                 <div className="state-readout">
                   <span>RESULTADO ACTUAL</span>
-                  <strong className="text-cyan-glow">RUN #{runCount} · MOCK · {totalFrames} FRAMES</strong>
+                  <strong className="text-cyan-glow">CORRIDA #{runCount} · MOCK · {totalFrames} FRAMES</strong>
                 </div>
                 <span className={configInvalid ? "status-chip status-chip-danger" : configPending ? "status-chip status-chip-warning" : "status-chip status-chip-ready"}>
-                  {configInvalid ? "CONFIG INVÁLIDA" : configPending ? "CONFIG PENDIENTE" : "SIM READY"}
+                  {configInvalid ? "CONFIG INVÁLIDA" : configPending ? "CONFIG PENDIENTE" : "SIM LISTA"}
                 </span>
                 <span className="text-mist flex-1 text-right">{uiMessage}</span>
-              </div>
+              </div>}
 
-              <PlaybackBar
+              {showTimeline && <PlaybackBar
                 currentFrame={safeFrame}
                 totalFrames={totalFrames}
                 currentTime={currentTime}
@@ -355,17 +612,21 @@ export default function App() {
                 speed={speed}
                 speedPresets={[0.25, 0.5, 1, 2, 4]}
                 onPlay={handlePlay}
-                onPause={() => setPlaying(false)}
+                onPause={handlePause}
                 onSeek={handleSeek}
-                onRestart={() => {
-                  setCurrentFrame(0);
-                  setPlaying(false);
-                }}
-                onSpeedChange={setSpeed}
+                onRestart={handleRestart}
+                onSpeedChange={handleSpeedChange}
                 disabled={playbackDisabled}
                 disabledReason={playbackDisabledReason}
                 onDisabledAttempt={() => setUiMessage(playbackDisabledReason)}
-              />
+                eventTime={result.outcome.interceptTime ?? result.outcome.minDistanceTime}
+                eventLabel={result.outcome.intercepted ? "EVENTO DE INTERCEPCIÓN" : "DISTANCIA MÍNIMA"}
+              />}
+              <div className="secondary-controls">
+                <button onClick={() => setShowStateStrip((value) => !value)} className="hud-mini-button">RESUMEN</button>
+                <button onClick={() => setShowTimeline((value) => !value)} className="hud-mini-button">LÍNEA DE TIEMPO</button>
+                <button onClick={() => setLogSignal((signal) => signal + 1)} className="hud-mini-button">BITÁCORA</button>
+              </div>
             </motion.div>
           ) : (
             <motion.div
@@ -410,8 +671,19 @@ export default function App() {
           <span className="w-1 h-1 bg-hud pulse-dot inline-block" />
           CONFIG {configStatus}
         </span>
-        <span>RESULTADO: {totalFrames} FRAMES | PANEL/DRAFT dt={config.simulation.dt}s</span>
+        <span>RESULTADO: {totalFrames} FRAMES | BORRADOR dt={config.simulation.dt}s</span>
+        <button onClick={() => setShowShortcutHelp(true)} className="hud-mini-button" title="H · Mostrar ayuda">ATAJOS [H]</button>
       </div>
+      <MissionLog
+        events={missionEvents}
+        onClear={() => setMissionEvents([])}
+        toggleSignal={logSignal}
+        closeSignal={closePanelsSignal}
+        onToggle={(open) => {
+          addEvent(`Bitácora ${open ? "abierta" : "cerrada"}`, "info", false);
+          playTone(open ? 500 : 300);
+        }}
+      />
       </div>
     </MotionConfig>
   );
