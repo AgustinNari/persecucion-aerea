@@ -21,10 +21,14 @@ export default function GraphPlaceholder({
   result,
   currentFrame,
 }: GraphPlaceholderProps) {
-  const aircraftPos = result.aircraft.position[currentFrame];
-  const missilePos = result.missile.position[currentFrame];
-  const distance = result.distance[currentFrame];
-  const time = result.time[currentFrame];
+  const lastFrame = Math.max(0, result.time.length - 1);
+  const safeFrame = Number.isFinite(currentFrame)
+    ? Math.min(Math.max(0, Math.floor(currentFrame)), lastFrame)
+    : 0;
+  const aircraftPos = result.aircraft.position[safeFrame] ?? [0, 0, 0];
+  const missilePos = result.missile.position[safeFrame] ?? [0, 0, 0];
+  const distance = result.distance[safeFrame] ?? 0;
+  const time = result.time[safeFrame] ?? 0;
 
   const accentColorMap = {
     hud: "var(--color-hud)",
@@ -64,6 +68,10 @@ export default function GraphPlaceholder({
 
         {/* Live telemetry */}
         <div className="space-y-1.5 font-mono text-[10px] tabular-nums tracking-widest">
+          <div className="flex justify-between gap-6 text-mist">
+            <span>FRAME:</span>
+            <span>{safeFrame}/{lastFrame}</span>
+          </div>
           <div className="flex justify-between gap-6">
             <span className="text-amber-glow">TGT (A/C):</span>
             <span className="text-bright">

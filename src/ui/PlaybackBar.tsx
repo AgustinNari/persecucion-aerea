@@ -18,6 +18,9 @@ interface PlaybackBarProps {
   onSeek: (frame: number) => void;
   onRestart: () => void;
   onSpeedChange: (speed: number) => void;
+  disabled?: boolean;
+  disabledReason?: string;
+  onDisabledAttempt?: () => void;
 }
 
 export default function PlaybackBar({
@@ -33,23 +36,35 @@ export default function PlaybackBar({
   onSeek,
   onRestart,
   onSpeedChange,
+  disabled = false,
+  disabledReason,
+  onDisabledAttempt,
 }: PlaybackBarProps) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const progress = totalFrames > 1 ? currentFrame / (totalFrames - 1) : 0;
+  const lastFrame = Math.max(0, totalFrames - 1);
+  const safeFrame = Number.isFinite(currentFrame)
+    ? Math.min(Math.max(0, Math.floor(currentFrame)), lastFrame)
+    : 0;
+  const progress = totalFrames > 1 ? safeFrame / lastFrame : 0;
 
   //Seek logic
   const seekFromEvent = useCallback(
     (clientX: number) => {
       if (!trackRef.current) return;
       const rect = trackRef.current.getBoundingClientRect();
+      if (rect.width <= 0) return;
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      onSeek(Math.round(ratio * (totalFrames - 1)));
+      onSeek(Math.round(ratio * lastFrame));
     },
-    [onSeek, totalFrames],
+    [lastFrame, onSeek],
   );
 
   const handleTrackMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      if (disabled) {
+        onDisabledAttempt?.();
+        return;
+      }
       seekFromEvent(e.clientX);
       const handleMouseMove = (ev: MouseEvent) => seekFromEvent(ev.clientX);
       const handleMouseUp = () => {
@@ -59,15 +74,25 @@ export default function PlaybackBar({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [seekFromEvent],
+    [disabled, onDisabledAttempt, seekFromEvent],
   );
+
+  const handlePlayPause = () => {
+    if (disabled) {
+      onDisabledAttempt?.();
+      return;
+    }
+    if (playing) onPause();
+    else onPlay();
+  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: 0.2 }}
-      className="border-t border-panel-border bg-obsidian/95 px-4 py-2 flex items-center gap-3"
+      className={`border-t border-panel-border bg-obsidian/95 px-4 py-2 flex items-center gap-3 ${disabled ? "opacity-65" : ""}`}
+      title={disabled ? disabledReason : undefined}
     >
       {/*Mission label */}
       <span className="text-[8px] text-mist tracking-[0.2em] min-w-[60px]">TIMELINE</span>
@@ -89,14 +114,15 @@ export default function PlaybackBar({
 
         {/* Play/Pause */}
         <motion.button
-          onClick={playing ? onPause : onPlay}
+          onClick={handlePlayPause}
           className={`w-8 h-8 flex items-center justify-center border cursor-pointer transition-all ${playing
             ? "bg-hud/15 border-hud text-hud glow-hud"
             : "bg-hud/5 border-hud/50 text-hud hover:bg-hud/10 hover:border-hud"
             }`}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          title={playing ? "PAUSE" : "EXECUTE"}
+          title={disabled ? disabledReason : playing ? "PAUSE" : "EXECUTE"}
+          aria-disabled={disabled}
         >
           {playing ? (
             <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
@@ -123,7 +149,7 @@ export default function PlaybackBar({
       <div
         ref={trackRef}
         onMouseDown={handleTrackMouseDown}
-        className="flex-1 relative h-6 flex items-center cursor-crosshair group"
+        className={`flex-1 relative h-6 flex items-center group ${disabled ? "cursor-not-allowed" : "cursor-crosshair"}`}
       >
         {/* Track background */}
         <div className="absolute inset-x-0 h-1 bg-obsidian border border-slate-steel overflow-hidden">
@@ -159,8 +185,14 @@ export default function PlaybackBar({
 
       {/*Frame counter */}
       <div className="text-[9px] text-ash tabular-nums tracking-wider min-w-[70px] text-right">
-        FRAME {String(currentFrame).padStart(3, "0")}/{String(totalFrames - 1).padStart(3, "0")}
+        FRAME {String(safeFrame).padStart(3, "0")}/{String(lastFrame).padStart(3, "0")}
       </div>
+
+      {disabled && (
+        <div className="border border-warning/30 bg-warning/5 px-2 py-0.5 text-[8px] text-warning tracking-[0.15em]">
+          LOCKED
+        </div>
+      )}
 
       {/* Speed selector */}
       <div className="flex items-center gap-px">

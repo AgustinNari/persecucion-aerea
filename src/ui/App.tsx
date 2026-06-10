@@ -1,11 +1,11 @@
 /**
  * Grupo 3 — UI / orquestador.
  */
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { SimulationConfig, SimulationResult } from "../shared/types";
 import { mockResult, mockConfig } from "../shared/mockResult";
-import Controls from "./Controls";
+import Controls, { validateConfig } from "./Controls";
 import PlaybackBar from "./PlaybackBar";
 import StatusPanel from "./StatusPanel";
 import GraphPlaceholder from "./GraphPlaceholder";
@@ -29,19 +29,131 @@ const fadeInUp = {
   animate: { opacity: 1, y: 0 },
 };
 
+function clampFrame(frame: number, lastFrame: number) {
+  return Number.isFinite(frame)
+    ? Math.min(Math.max(0, Math.floor(frame)), lastFrame)
+    : 0;
+}
+
+function runSimulation(config: SimulationConfig): SimulationResult {
+  // Reemplazar este fallback con simulate(config) cuando el Grupo 2 lo exporte.
+  const fallbackResult = structuredClone(mockResult);
+  return {
+    ...fallbackResult,
+    metadata: {
+      ...fallbackResult.metadata,
+      config: structuredClone(config),
+      integrator: config.simulation.integrator,
+      steps: fallbackResult.time.length,
+    },
+  };
+}
+
+function configsMatch(left: SimulationConfig, right: SimulationConfig) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("simulation");
-  const [config, setConfig] = useState<SimulationConfig>(mockConfig);
-  const [result, setResult] = useState<SimulationResult>(mockResult);
-
+  const [config, setConfig] = useState<SimulationConfig>(() => structuredClone(mockConfig));
+  const [result, setResult] = useState<SimulationResult>(() => structuredClone(mockResult));
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [showControls, setShowControls] = useState(true);
+  const [uiMessage, setUiMessage] = useState("Simulación cargada con datos mock · lista para reproducir");
+  const lastTimestampRef = useRef<number | null>(null);
+  const elapsedRef = useRef(0);
 
-  const totalFrames = result.metadata.steps;
+  const totalFrames = result.time.length;
+  const lastFrame = Math.max(0, totalFrames - 1);
+  const safeFrame = clampFrame(currentFrame, lastFrame);
 
-  const currentTime = result.time[currentFrame] ?? 0;
-  const currentDistance = result.distance[currentFrame] ?? 0;
-  const closingVel = result.closingVelocity[currentFrame] ?? 0;
+  const currentTime = result.time[safeFrame] ?? 0;
+  const currentDistance = result.distance[safeFrame] ?? 0;
+  const closingVel = result.closingVelocity[safeFrame] ?? 0;
+  const configErrors = validateConfig(config);
+  const configInvalid = configErrors.length > 0;
+  const configPending = !configsMatch(config, result.metadata.config);
+  const configStatus = configInvalid ? "INVÁLIDA" : configPending ? "PENDIENTE" : "APLICADA";
+  const playbackDisabled = configInvalid || configPending;
+  const playbackDisabledReason = configInvalid
+    ? "Corregí la configuración antes de reproducir"
+    : "Ejecutá la simulación para aplicar cambios";
+
+  useEffect(() => {
+    setCurrentFrame((frame) => clampFrame(frame, lastFrame));
+  }, [lastFrame, result]);
+
+  useEffect(() => {
+    if (!playing || totalFrames <= 1) {
+      lastTimestampRef.current = null;
+      elapsedRef.current = 0;
+      return;
+    }
+
+    const dt = result.metadata.config.simulation.dt;
+    const frameDuration = (Number.isFinite(dt) && dt > 0 ? dt : 0.05) * 1000 / speed;
+    let animationFrameId = 0;
+
+    const advance = (timestamp: number) => {
+      if (lastTimestampRef.current === null) {
+        lastTimestampRef.current = timestamp;
+      } else {
+        elapsedRef.current += timestamp - lastTimestampRef.current;
+        lastTimestampRef.current = timestamp;
+      }
+
+      const framesToAdvance = Math.floor(elapsedRef.current / frameDuration);
+      if (framesToAdvance > 0) {
+        elapsedRef.current -= framesToAdvance * frameDuration;
+        setCurrentFrame((frame) => {
+          const nextFrame = Math.min(frame + framesToAdvance, lastFrame);
+          if (nextFrame >= lastFrame) setPlaying(false);
+          return nextFrame;
+        });
+      }
+
+      animationFrameId = requestAnimationFrame(advance);
+    };
+
+    animationFrameId = requestAnimationFrame(advance);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [lastFrame, playing, result.metadata.config.simulation.dt, speed, totalFrames]);
+
+  const handleSimulate = useCallback((nextConfig: SimulationConfig) => {
+    setConfig(structuredClone(nextConfig));
+    setResult(runSimulation(nextConfig));
+    setCurrentFrame(0);
+    setPlaying(false);
+    setUiMessage("Simulación cargada con datos mock · lista para reproducir");
+  }, []);
+
+  const handleConfigChange = useCallback((nextConfig: SimulationConfig) => {
+    setConfig(nextConfig);
+    setPlaying(false);
+    setUiMessage(
+      validateConfig(nextConfig).length > 0
+        ? "Corregí la configuración antes de reproducir"
+        : "Ejecutá la simulación para aplicar cambios",
+    );
+  }, []);
+
+  const handlePlay = useCallback(() => {
+    if (playbackDisabled) {
+      setUiMessage(playbackDisabledReason);
+      return;
+    }
+    setCurrentFrame((frame) => frame >= lastFrame ? 0 : frame);
+    setPlaying(totalFrames > 1);
+    setUiMessage("Reproduciendo última simulación aplicada");
+  }, [lastFrame, playbackDisabled, playbackDisabledReason, totalFrames]);
+
+  const handleSeek = useCallback((frame: number) => {
+    setCurrentFrame(clampFrame(frame, lastFrame));
+    setPlaying(false);
+  }, [lastFrame]);
+
   return (
     <div className="min-h-screen bg-void flex flex-col scanlines relative">
       <motion.header
@@ -110,7 +222,7 @@ export default function App() {
           currentDistance={currentDistance}
           closingVelocity={closingVel}
           outcome={result.outcome}
-          playing={false}
+          playing={playing}
         />
       </motion.header>
 
@@ -138,8 +250,8 @@ export default function App() {
                     >
                       <Controls
                         config={config}
-                        onConfigChange={setConfig}
-                        onSimulate={() => { }}
+                        onConfigChange={handleConfigChange}
+                        onSimulate={handleSimulate}
                       />
                     </motion.aside>
                   )}
@@ -179,7 +291,7 @@ export default function App() {
                           description="Vista cenital | Grilla táctica"
                           accent="amber"
                           result={result}
-                          currentFrame={currentFrame}
+                          currentFrame={safeFrame}
                         />
                       </div>
                     </div>
@@ -198,7 +310,7 @@ export default function App() {
                           description="Espacio de misión | Three.js"
                           accent="cyan"
                           result={result}
-                          currentFrame={currentFrame}
+                          currentFrame={safeFrame}
                         />
                       </div>
                     </div>
@@ -220,7 +332,7 @@ export default function App() {
                           description="Distancia R(t) | Análisis de intercepción"
                           accent="hud"
                           result={result}
-                          currentFrame={currentFrame}
+                          currentFrame={safeFrame}
                         />
                       </div>
                     </div>
@@ -228,19 +340,34 @@ export default function App() {
                 </motion.div>
               </div>
 
+              <div className="border-t border-panel-border bg-obsidian/95 px-4 py-1 flex items-center gap-3 text-[8px] tracking-[0.12em]">
+                <span className="text-cyan-glow">FUENTE: MOCK · PENDIENTE GRUPO 2</span>
+                <span className={configInvalid ? "text-danger" : configPending ? "text-warning" : "text-hud"}>
+                  CONFIG: {configStatus}
+                </span>
+                <span className="text-mist flex-1">{uiMessage}</span>
+                <span className="text-ash">RESULTADO: {totalFrames} FRAMES</span>
+              </div>
+
               <PlaybackBar
-                currentFrame={currentFrame}
+                currentFrame={safeFrame}
                 totalFrames={totalFrames}
                 currentTime={currentTime}
-                totalTime={result.time[totalFrames - 1] ?? 0}
-                playing={false}
-                speed={1}
+                totalTime={result.time[lastFrame] ?? 0}
+                playing={playing}
+                speed={speed}
                 speedPresets={[0.25, 0.5, 1, 2, 4]}
-                onPlay={() => { }}
-                onPause={() => { }}
-                onSeek={(frame) => setCurrentFrame(frame)}
-                onRestart={() => { }}
-                onSpeedChange={() => { }}
+                onPlay={handlePlay}
+                onPause={() => setPlaying(false)}
+                onSeek={handleSeek}
+                onRestart={() => {
+                  setCurrentFrame(0);
+                  setPlaying(false);
+                }}
+                onSpeedChange={setSpeed}
+                disabled={playbackDisabled}
+                disabledReason={playbackDisabledReason}
+                onDisabledAttempt={() => setUiMessage(playbackDisabledReason)}
               />
             </motion.div>
           ) : (
@@ -281,12 +408,12 @@ export default function App() {
       </main>
 
       <div className="px-4 py-1 border-t border-panel-border bg-obsidian/90 flex items-center justify-between text-[8px] text-ash tracking-[0.15em]">
-        <span>SISTEMA OPERATIVO | INTEGRADOR: {result.metadata.integrator.toUpperCase()} | dt={config.simulation.dt}s</span>
+        <span>FUENTE: MOCK | INTEGRADOR: {result.metadata.integrator.toUpperCase()} | dt ACTIVO={result.metadata.config.simulation.dt}s</span>
         <span className="flex items-center gap-2">
           <span className="w-1 h-1 bg-hud pulse-dot inline-block" />
-          SISTEMA NOMINAL
+          CONFIG {configStatus}
         </span>
-        <span>FRAMES: {totalFrames} | MANIOBRA: {config.aircraft.maneuver.toUpperCase()} | GUIADO: {config.missile.guidanceLaw === "proportional_nav" ? "PN N=" + config.missile.navConstant : "PP"}</span>
+        <span>RESULTADO: {totalFrames} FRAMES | PANEL/DRAFT dt={config.simulation.dt}s</span>
       </div>
     </div>
   );
