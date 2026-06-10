@@ -2,13 +2,14 @@
  * Grupo 3 — UI / orquestador.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import type { SimulationConfig, SimulationResult } from "../shared/types";
 import { mockResult, mockConfig } from "../shared/mockResult";
 import Controls, { validateConfig } from "./Controls";
 import PlaybackBar from "./PlaybackBar";
 import StatusPanel from "./StatusPanel";
-import GraphPlaceholder from "./GraphPlaceholder";
+import GraphWorkspace from "./GraphWorkspace";
+import UiSettingsPanel, { type UiSettings } from "./UiSettingsPanel";
 
 type TabId = "simulation" | "theory";
 
@@ -16,17 +17,6 @@ const tabContentVariants = {
   initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -6 },
-};
-
-const staggerContainer = {
-  animate: {
-    transition: { staggerChildren: 0.08, delayChildren: 0.15 },
-  },
-};
-
-const fadeInUp = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0 },
 };
 
 function clampFrame(frame: number, lastFrame: number) {
@@ -61,6 +51,14 @@ export default function App() {
   const [speed, setSpeed] = useState(1);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [showControls, setShowControls] = useState(true);
+  const [presentationMode, setPresentationMode] = useState(false);
+  const [uiSettings, setUiSettings] = useState<UiSettings>({
+    theme: "green",
+    scanlines: true,
+    glow: true,
+    reducedMotion: false,
+    density: "normal",
+  });
   const [uiMessage, setUiMessage] = useState("Simulación cargada con datos mock · lista para reproducir");
   const lastTimestampRef = useRef<number | null>(null);
   const elapsedRef = useRef(0);
@@ -155,7 +153,16 @@ export default function App() {
   }, [lastFrame]);
 
   return (
-    <div className="min-h-screen bg-void flex flex-col scanlines relative">
+    <MotionConfig reducedMotion={uiSettings.reducedMotion ? "always" : "never"}>
+      <div
+        className="min-h-screen bg-void flex flex-col relative ui-root"
+        data-theme={uiSettings.theme}
+        data-scanlines={uiSettings.scanlines ? "on" : "off"}
+        data-glow={uiSettings.glow ? "on" : "off"}
+        data-motion={uiSettings.reducedMotion ? "reduced" : "full"}
+        data-density={uiSettings.density}
+        data-presentation={presentationMode ? "on" : "off"}
+      >
       <motion.header
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -217,13 +224,27 @@ export default function App() {
           ))}
         </nav>
 
-        <StatusPanel
-          currentTime={currentTime}
-          currentDistance={currentDistance}
-          closingVelocity={closingVel}
-          outcome={result.outcome}
-          playing={playing}
-        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPresentationMode((value) => !value)}
+            className={`hud-mini-button ${presentationMode ? "hud-mini-button-active" : ""}`}
+          >
+            {presentationMode ? "SALIR PRESENTACIÓN" : "PRESENTACIÓN"}
+          </button>
+          <UiSettingsPanel
+            settings={uiSettings}
+            onChange={setUiSettings}
+            presentationMode={presentationMode}
+            onPresentationModeChange={setPresentationMode}
+          />
+          <StatusPanel
+            currentTime={currentTime}
+            currentDistance={currentDistance}
+            closingVelocity={closingVel}
+            outcome={result.outcome}
+            playing={playing}
+          />
+        </div>
       </motion.header>
 
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -240,7 +261,7 @@ export default function App() {
             >
               <div className="flex-1 flex overflow-hidden">
                 <AnimatePresence>
-                  {showControls && (
+                  {showControls && !presentationMode && (
                     <motion.aside
                       initial={{ width: 0, opacity: 0 }}
                       animate={{ width: 310, opacity: 1 }}
@@ -257,7 +278,7 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
-                <motion.button
+                {!presentationMode && <motion.button
                   onClick={() => setShowControls((v) => !v)}
                   className="self-start mt-3 px-0.5 py-4 bg-obsidian border border-panel-border border-l-0 text-mist hover:text-hud transition-colors cursor-pointer z-10"
                   whileHover={{ x: 2 }}
@@ -270,74 +291,9 @@ export default function App() {
                   >
                     ◂
                   </motion.span>
-                </motion.button>
+                </motion.button>}
 
-                <motion.div
-                  variants={staggerContainer}
-                  initial="initial"
-                  animate="animate"
-                  className="flex-1 p-3 grid grid-cols-2 grid-rows-[1fr_0.8fr] gap-2 overflow-hidden tactical-grid"
-                >
-                  <motion.div variants={fadeInUp} className="mil-panel mil-panel-amber p-0 flex flex-col min-h-0 relative">
-                    <div className="mil-corners">
-                      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-amber-glow/10">
-                        <div className="w-1.5 h-1.5 bg-amber-glow pulse-dot" />
-                        <span className="tac-label">DISPLAY 01</span>
-                        <span className="text-[8px] text-amber-glow/60 ml-auto tracking-widest">CENITAL 2D</span>
-                      </div>
-                      <div className="flex-1 p-2 graph-container">
-                        <GraphPlaceholder
-                          name="GridView2D"
-                          description="Vista cenital | Grilla táctica"
-                          accent="amber"
-                          result={result}
-                          currentFrame={safeFrame}
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  <motion.div variants={fadeInUp} className="mil-panel mil-panel-cyan p-0 flex flex-col min-h-0 relative">
-                    <div className="mil-corners">
-                      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-cyan-glow/10">
-                        <div className="w-1.5 h-1.5 bg-cyan-glow pulse-dot" />
-                        <span className="tac-label">DISPLAY 02</span>
-                        <span className="text-[8px] text-cyan-glow/60 ml-auto tracking-widest">TRAYECTORIA 3D</span>
-                      </div>
-                      <div className="flex-1 p-2 graph-container">
-                        <GraphPlaceholder
-                          name="Trajectory3D"
-                          description="Espacio de misión | Three.js"
-                          accent="cyan"
-                          result={result}
-                          currentFrame={safeFrame}
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  <motion.div
-                    variants={fadeInUp}
-                    className="mil-panel p-0 flex flex-col col-span-2 min-h-0 relative"
-                  >
-                    <div className="mil-corners">
-                      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-hud/10">
-                        <div className="w-1.5 h-1.5 bg-hud pulse-dot" />
-                        <span className="tac-label">DISPLAY 03</span>
-                        <span className="text-[8px] text-hud/60 ml-auto tracking-widest">RANGO vs TIEMPO</span>
-                      </div>
-                      <div className="flex-1 p-2 graph-container">
-                        <GraphPlaceholder
-                          name="DistancePlot"
-                          description="Distancia R(t) | Análisis de intercepción"
-                          accent="hud"
-                          result={result}
-                          currentFrame={safeFrame}
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-                </motion.div>
+                <GraphWorkspace result={result} currentFrame={safeFrame} />
               </div>
 
               <div className="border-t border-panel-border bg-obsidian/95 px-4 py-1 flex items-center gap-3 text-[8px] tracking-[0.12em]">
@@ -415,6 +371,7 @@ export default function App() {
         </span>
         <span>RESULTADO: {totalFrames} FRAMES | PANEL/DRAFT dt={config.simulation.dt}s</span>
       </div>
-    </div>
+      </div>
+    </MotionConfig>
   );
 }
